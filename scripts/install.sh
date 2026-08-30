@@ -23,15 +23,21 @@ rm -f /etc/.wtest
 echo "== rocketd daemon"
 systemctl stop rocketd 2>/dev/null || true
 install -m 755 "$DIR/rocketd" /usr/local/bin/rocketd
-mkdir -p /var/lib/rocketd/confs /var/lib/rocketd/awg /var/lib/rocketd/rulesets /var/lib/rocketd/bin
+
+# Состояние — на записываемом разделе: корень на UT смонтирован ro, и после
+# перезагрузки запись в /var/lib/rocketd падала с "read-only file system".
+STATE=/userdata/system-data/var/lib/rocketd
+mkdir -p "$STATE"/confs "$STATE"/awg "$STATE"/rulesets "$STATE"/bin
+chmod 700 "$STATE" "$STATE"/confs "$STATE"/awg
 mkdir -p /var/run/amneziawg
-chmod 700 /var/lib/rocketd /var/lib/rocketd/confs /var/lib/rocketd/awg
 chmod 700 /var/run/amneziawg
 
 cat > /etc/systemd/system/rocketd.service <<'EOF'
 [Unit]
 Description=Rocket proxy root daemon (HTTP 127.0.0.1:8877)
-After=network.target
+After=network.target local-fs.target
+# Состояние лежит на /userdata: без этого демон может стартовать до монтирования.
+RequiresMountsFor=/userdata
 
 [Service]
 ExecStart=/usr/local/bin/rocketd
@@ -68,8 +74,8 @@ aa-clickhook -f 2>/dev/null || true
 # Бинари доступны демону и из click, но локальная копия спасает при пересборке UI.
 CLICK_BIN=/opt/click.ubuntu.com/rocket/current/bin
 if [ -d "$CLICK_BIN" ]; then
-  for f in sing-box amneziawg-go awg; do
-    [ -f "$CLICK_BIN/$f" ] && install -m 755 "$CLICK_BIN/$f" "/var/lib/rocketd/bin/$f"
+  for f in sing-box amneziawg-go awg zxing; do
+    [ -f "$CLICK_BIN/$f" ] && install -m 755 "$CLICK_BIN/$f" "$STATE/bin/$f"
   done
 fi
 systemctl restart rocketd

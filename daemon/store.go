@@ -28,6 +28,8 @@ func sbConfPath() string  { return filepath.Join(StateDir, "singbox.json") }
 func connLogPath() string { return filepath.Join(StateDir, "connlog.jsonl") }
 
 // writeSecret — атомарная запись 0600 (перенос write_secret из awgd.py).
+// Данные и запись каталога сбрасываются на диск: без fsync переименование
+// может не дожить до перезагрузки, и выбранный узел молча откатывался.
 func writeSecret(path, text string) error {
 	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
@@ -35,6 +37,11 @@ func writeSecret(path, text string) error {
 		return err
 	}
 	if _, err = f.WriteString(text); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err = f.Sync(); err != nil {
 		f.Close()
 		os.Remove(tmp)
 		return err
@@ -51,7 +58,15 @@ func writeSecret(path, text string) error {
 		os.Remove(tmp)
 		return err
 	}
-	return os.Chmod(path, 0o600)
+	if err = os.Chmod(path, 0o600); err != nil {
+		return err
+	}
+	// Сброс каталога фиксирует само переименование.
+	if d, derr := os.Open(filepath.Dir(path)); derr == nil {
+		d.Sync()
+		d.Close()
+	}
+	return nil
 }
 
 func writeJSON(path string, v any) error {
@@ -81,6 +96,8 @@ func NewStore() (*Store, error) {
 		return nil, err
 	}
 	s := &Store{state: State{Mode: "config"}}
+	// Перенос состояния с прежнего места на ro-корне — до чтения файлов.
+	migrateStateDir()
 	if err := readJSON(statePath(), &s.state); err != nil && !errors.Is(err, os.ErrNotExist) {
 		logf("state.json unreadable: %v", err)
 	}
@@ -269,6 +286,62 @@ func (s *Store) migrateEncodedNodes() {
 			logf("save state after migration: %v", err)
 		}
 	}
+}
+
+// migrateStateDir переносит состояние из прежнего каталога на ro-корне.
+// Вызывается до чтения состояния: иначе пользователь потерял бы узлы и конфиги
+// при переходе на записываемый раздел.
+func migrateStateDir() {
+	if StateDir == LegacyStateDir {
+		return
+	}
+	if _, err := os.Stat(filepath.Join(LegacyStateDir, "nodes.json")); err != nil {
+		return // переносить нечего
+	}
+	// Уже перенесено — второй раз не трогаем, чтобы не затереть свежее.
+	if _, err := os.Stat(filepath.Join(StateDir, "nodes.json")); err == nil {
+		return
+	}
+	moved := 0
+	for _, name := range []string{"state.json", "nodes.json", "subs.json", "connlog.jsonl"} {
+		if copyFileIfMissing(filepath.Join(LegacyStateDir, name), filepath.Join(StateDir, name)) {
+			moved++
+		}
+	}
+	for _, dir := range []string{"confs", "awg"} {
+		src := filepath.Join(LegacyStateDir, dir)
+		ents, err := os.ReadDir(src)
+		if err != nil {
+			continue
+		}
+		for _, e := range ents {
+			if e.IsDir() {
+				continue
+			}
+			if copyFileIfMissing(filepath.Join(src, e.Name()),
+				filepath.Join(StateDir, dir, e.Name())) {
+				moved++
+			}
+		}
+	}
+	if moved > 0 {
+		logf("migrated %d state files from %s to %s", moved, LegacyStateDir, StateDir)
+	}
+}
+
+func copyFileIfMissing(src, dst string) bool {
+	if _, err := os.Stat(dst); err == nil {
+		return false
+	}
+	b, err := os.ReadFile(src)
+	if err != nil {
+		return false
+	}
+	if err := writeSecret(dst, string(b)); err != nil {
+		logf("migrate %s: %v", src, err)
+		return false
+	}
+	return true
 }
 
 func (s *Store) SetLatency(id string, ms int) {

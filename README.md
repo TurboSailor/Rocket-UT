@@ -55,7 +55,9 @@ flowchart LR
 ## Requirements
 
 - Ubuntu Touch 24.04 (Lomiri, systemd), **aarch64** — armhf is not supported.
-- A writable root filesystem for installation (`sudo mount -o remount,rw /`).
+- A writable root filesystem for installation only (`sudo mount -o remount,rw /`);
+  at runtime the root filesystem stays read-only, because daemon state lives on
+  the writable partition at `/userdata/system-data/var/lib/rocketd`.
 - `adb` access from a workstation.
 
 ## Install
@@ -209,7 +211,9 @@ ran on the device itself over loopback, so it had no NAT).
 ## Требования
 
 - Ubuntu Touch 24.04 (Lomiri, systemd), **aarch64** — armhf не поддерживается.
-- Записываемый корень на время установки (`sudo mount -o remount,rw /`).
+- Записываемый корень только на время установки (`sudo mount -o remount,rw /`);
+  в работе корень остаётся ro, потому что состояние демона лежит на записываемом
+  разделе: `/userdata/system-data/var/lib/rocketd`.
 - Доступ по `adb` с рабочей машины.
 
 ## Установка

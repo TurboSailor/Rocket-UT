@@ -20,7 +20,14 @@ const (
 	EscapePrio  = 8801
 	AwgSockDir  = "/var/run/amneziawg"
 
-	StateDir  = "/var/lib/rocketd"
+	// Корень на Ubuntu Touch смонтирован ro, поэтому состояние живёт на
+	// записываемом разделе. Системные сервисы UT хранят своё там же
+	// (/userdata/system-data/var/lib/<name> бинд-монтируется в /var/lib/<name>),
+	// но нам bind-mount не нужен — пишем напрямую и не зависим от rw-корня.
+	StateDir = "/userdata/system-data/var/lib/rocketd"
+	// LegacyStateDir — прежнее место на ro-корне; состояние оттуда переносится.
+	LegacyStateDir = "/var/lib/rocketd"
+
 	ClickRoot = "/opt/click.ubuntu.com/rocket/current"
 	ClickBin  = ClickRoot + "/bin"
 	LocalBin  = StateDir + "/bin"
