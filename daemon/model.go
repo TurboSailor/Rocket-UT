@@ -33,6 +33,7 @@ type Node struct {
 	ALPN     string  `json:"alpn,omitempty"`
 	FP       string  `json:"fp,omitempty"`
 	Insecure bool    `json:"insecure"`
+	TFO      bool    `json:"tfo,omitempty"`
 	AlterID  int     `json:"alter_id,omitempty"`
 	Reality  Reality `json:"reality,omitempty"`
 	PrivKey  string  `json:"priv_key,omitempty"`

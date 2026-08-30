@@ -166,6 +166,64 @@ func (a *API) Routes() *http.ServeMux {
 		reply(w, 200, out)
 	})
 
+	mux.HandleFunc("/nodes/update", func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		old, ok := a.st.Node(id)
+		if !ok {
+			fail(w, 404, "no such node")
+			return
+		}
+		raw, err := body(r)
+		if err != nil {
+			fail(w, 400, "read body: %v", err)
+			return
+		}
+		// Правим копию: неуказанные поля сохраняют прежние значения.
+		edited := old
+		if err := json.Unmarshal([]byte(raw), &edited); err != nil {
+			fail(w, 400, "bad json: %v", err)
+			return
+		}
+		edited.Type = strings.ToLower(strings.TrimSpace(edited.Type))
+		edited.Server = strings.TrimSpace(edited.Server)
+		edited.Name = strings.TrimSpace(edited.Name)
+		if edited.Name == "" {
+			edited.Name = old.Name
+		}
+		if edited.Type == "awg" {
+			// Конфиг AmneziaWG правится как файл, а не полями узла.
+			edited.AWGConf = old.AWGConf
+		} else if edited.Server == "" || edited.Port <= 0 || edited.Port > 65535 {
+			fail(w, 400, "server and port are required")
+			return
+		}
+		// Проверяем, что узел вообще транслируется в outbound.
+		if _, err := nodeOutbound(edited, tagProxy); err != nil {
+			fail(w, 400, "%v", err)
+			return
+		}
+		newID, ok := a.st.ReplaceNode(id, edited)
+		if !ok {
+			fail(w, 404, "no such node")
+			return
+		}
+		// Активный узел переезжает на новый id.
+		if a.st.State().NodeID == id {
+			a.st.SetState(func(s *State) { s.NodeID = newID; s.Err = "" })
+			if err := a.en.Restack(); err != nil {
+				st := a.status()
+				st["error"] = err.Error()
+				st["nodes"] = a.st.Nodes()
+				reply(w, 500, st)
+				return
+			}
+		}
+		out := a.status()
+		out["nodes"] = a.st.Nodes()
+		out["id"] = newID
+		reply(w, 200, out)
+	})
+
 	mux.HandleFunc("/nodes/select", func(w http.ResponseWriter, r *http.Request) {
 		id := r.URL.Query().Get("id")
 		if _, ok := a.st.Node(id); !ok {

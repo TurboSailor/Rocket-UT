@@ -180,6 +180,97 @@ func (s *Store) DeleteNode(id string) bool {
 	return false
 }
 
+// ReplaceNode заменяет узел по старому id новым (id пересчитывается по адресу
+// и кредам, поэтому правка обычно его меняет). Возвращает новый id.
+// Узел, пришедший из подписки, при правке от неё отвязывается: иначе
+// следующее обновление подписки молча вернуло бы старые значения.
+func (s *Store) ReplaceNode(oldID string, n Node) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	idx := -1
+	for i := range s.nodes {
+		if s.nodes[i].ID == oldID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return "", false
+	}
+	n.SubID = ""
+	n.Latency = s.nodes[idx].Latency
+	n.setID()
+	// Если новый id совпал с другим существующим узлом — удаляем дубликат.
+	for i := len(s.nodes) - 1; i >= 0; i-- {
+		if i != idx && s.nodes[i].ID == n.ID {
+			s.nodes = append(s.nodes[:i], s.nodes[i+1:]...)
+			if i < idx {
+				idx--
+			}
+		}
+	}
+	s.nodes[idx] = n
+	s.saveNodesLocked()
+	return n.ID, true
+}
+
+// migrateEncodedNodes лечит узлы, сохранённые до исправления разбора
+// socks://base64(...) и http://base64(...): в Server лежал сам base64,
+// а логин с паролем терялись, поэтому такой узел не мог подключиться.
+func (s *Store) migrateEncodedNodes() {
+	s.mu.Lock()
+	changed := false
+	remap := map[string]string{}
+	for i := range s.nodes {
+		n := &s.nodes[i]
+		if n.Type != "socks5" && n.Type != "http" {
+			continue
+		}
+		dec, ok := decodeSRAuthority(n.Server)
+		if !ok {
+			continue
+		}
+		addr := dec
+		if at := strings.LastIndex(dec, "@"); at >= 0 {
+			cred := dec[:at]
+			addr = dec[at+1:]
+			if c := strings.Index(cred, ":"); c >= 0 {
+				n.User, n.Password = cred[:c], cred[c+1:]
+			} else {
+				n.User = cred
+			}
+		}
+		host, port, err := hostPort(addr)
+		if err != nil {
+			continue
+		}
+		oldID := n.ID
+		n.Server, n.Port = host, port
+		if strings.HasPrefix(n.Name, n.Type+"-") {
+			n.Name = n.Type + "-" + host
+		}
+		n.setID()
+		remap[oldID] = n.ID
+		changed = true
+		logf("migrated broken %s node -> %s:%d", n.Type, host, port)
+	}
+	if changed {
+		s.saveNodesLocked()
+	}
+	active, newActive := s.state.NodeID, ""
+	if v, ok := remap[active]; ok {
+		s.state.NodeID = v
+		newActive = v
+	}
+	st := s.state
+	s.mu.Unlock()
+	if newActive != "" {
+		if err := writeJSON(statePath(), st); err != nil {
+			logf("save state after migration: %v", err)
+		}
+	}
+}
+
 func (s *Store) SetLatency(id string, ms int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

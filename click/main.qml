@@ -1,4 +1,5 @@
 import QtQuick 2.7
+import Qt.labs.settings 1.0
 import Ubuntu.Components 1.3
 import "i18n.js" as I18n
 
@@ -23,6 +24,14 @@ MainView {
     property int qrPreviewRotation: 0
 
     function tr(k) { return I18n.tr(k) }
+
+    // Поправка поворота кадра запоминается: подобрав её один раз,
+    // пользователь не должен повторять это при каждом запуске.
+    Settings {
+        id: prefs
+        category: "scanner"
+        property alias previewRotation: root.qrPreviewRotation
+    }
 
     function api(path, cb, method, body) {
         var x = new XMLHttpRequest()
@@ -97,6 +106,7 @@ MainView {
         Component.onCompleted: { stack.push(home); root.refresh() }
         HomePage    { id: home;      visible: false }
         NodesPage   { id: nodesPage; visible: false }
+        NodeEditPage { id: nodeEdit; visible: false }
         SubsPage    { id: subsPage;  visible: false }
         ConfsPage   { id: confsPage; visible: false }
         RulesPage   { id: rulesPage; visible: false }

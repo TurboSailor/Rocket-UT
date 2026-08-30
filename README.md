@@ -145,7 +145,7 @@ ran on the device itself over loopback, so it had no NAT).
 
 - Not supported from Shadowrocket configs (reported in the UI as skipped lines):
   `[URL Rewrite]`, `[MITM]`, `IP-ASN`, `USER-AGENT`, `URL-REGEX`, `PROCESS-NAME`,
-  `policy-regex-filter`, Shadowsocks `plugin=`.
+  `policy-regex-filter`, Shadowsocks `plugin=`, proxy chaining (`chain=`).
 - `fallback` and `load-balance` proxy groups are mapped to sing-box `urltest`.
 - Changing rules restarts `sing-box`, so existing connections drop.
 - One active node at a time (proxy groups inside a `.conf` still work).
@@ -278,7 +278,7 @@ macOS. Пароль sudo для `make deploy` задаётся переменн�
 
 - Не поддерживается из конфигов Shadowrocket (показывается в UI как пропущенные строки):
   `[URL Rewrite]`, `[MITM]`, `IP-ASN`, `USER-AGENT`, `URL-REGEX`, `PROCESS-NAME`,
-  `policy-regex-filter`, `plugin=` у Shadowsocks.
+  `policy-regex-filter`, `plugin=` у Shadowsocks, цепочки прокси (`chain=`).
 - Группы `fallback` и `load-balance` отображаются в `urltest` из sing-box.
 - Изменение правил перезапускает `sing-box`, поэтому текущие соединения рвутся.
 - Один активный узел одновременно (группы политик внутри `.conf` при этом работают).

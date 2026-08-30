@@ -22,6 +22,9 @@ func main() {
 	en := NewEngine(st)
 	api := &API{st: st, en: en}
 
+	// Лечим узлы, сломанные прежним разбором socks://base64(...).
+	st.migrateEncodedNodes()
+
 	// Чистая установка получает штатный шаблон правил.
 	st.seedDefaultConf()
 

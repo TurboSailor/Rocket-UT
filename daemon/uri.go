@@ -385,10 +385,48 @@ func parseTrojan(s string) (Node, error) {
 	return n, nil
 }
 
+// decodeSRAuthority раскрывает base64-упакованную часть `user:pass@host:port`,
+// которую Shadowrocket кладёт в socks:// и http:// ссылки.
+// Декодируем только «голый» токен без ':', '@', '.', '/' — обычный
+// hostname или host:port под это условие не попадает, поэтому ложных
+// срабатываний на нормальных ссылках нет.
+func decodeSRAuthority(authority string) (string, bool) {
+	if authority == "" || strings.ContainsAny(authority, ":@./") {
+		return "", false
+	}
+	b, ok := b64decode(authority)
+	if !ok {
+		return "", false
+	}
+	dec := strings.TrimSpace(string(b))
+	if dec == "" || strings.ContainsAny(dec, " \t\r\n") {
+		return "", false
+	}
+	// Раскрытое должно быть адресом: [user:pass@]host:port.
+	addr := dec
+	if i := strings.LastIndex(dec, "@"); i >= 0 {
+		addr = dec[i+1:]
+	}
+	if _, _, err := hostPort(addr); err != nil {
+		return "", false
+	}
+	return dec, true
+}
+
 func parseSocksHTTP(s, typ string) (Node, error) {
 	u, err := url.Parse(s)
 	if err != nil {
 		return Node{}, err
+	}
+	// Shadowrocket-формат: socks://base64(user:pass@host:port)?params
+	// Без раскрытия узел молча получал base64 вместо хоста и пустые креды.
+	if dec, ok := decodeSRAuthority(u.Host); ok {
+		u2, err2 := url.Parse(u.Scheme + "://" + dec)
+		if err2 != nil {
+			return Node{}, fmt.Errorf("%s: bad encoded authority", typ)
+		}
+		u2.RawQuery, u2.Fragment = u.RawQuery, u.Fragment
+		u = u2
 	}
 	host := u.Hostname()
 	if host == "" {
@@ -418,6 +456,20 @@ func parseSocksHTTP(s, typ string) (Node, error) {
 	if u.User != nil {
 		n.User = u.User.Username()
 		n.Password, _ = u.User.Password()
+	}
+	q := u.Query()
+	// tfo=1 — TCP Fast Open, поддерживается диалером sing-box.
+	if truthy(q.Get("tfo")) {
+		n.TFO = true
+	}
+	if truthy(q.Get("over-tls")) || truthy(q.Get("tls")) {
+		n.TLS = true
+	}
+	if v := q.Get("sni"); v != "" {
+		n.SNI = v
+	}
+	if truthy(q.Get("allowInsecure")) {
+		n.Insecure = true
 	}
 	n.Name = fragName(u, fmt.Sprintf("%s-%s", typ, host))
 	n.setID()

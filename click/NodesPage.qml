@@ -1,7 +1,9 @@
 import QtQuick 2.7
 import Ubuntu.Components 1.3
-import Ubuntu.Components.ListItems 1.3 as ListItem
 
+// Список узлов. Тап — активировать; свайп влево — правка и удаление
+// (ListItem из Ubuntu.Components 1.3, а не ListItems.Subtitled: у последнего
+// нет ни actions, ни свойства control).
 Page {
     id: page
 
@@ -29,6 +31,32 @@ Page {
         ]
     }
 
+    function activate(id) {
+        root.busy = root.tr("working…")
+        root.api("/nodes/select?id=" + id, function(r) {
+            root.busy = ""
+            root.absorb(r)
+        }, "POST")
+    }
+
+    function edit(n) {
+        nodeEdit.node = n
+        stack.push(nodeEdit)
+    }
+
+    function remove(id) {
+        root.api("/nodes/delete?id=" + id, function(r) {
+            root.absorb(r)
+            root.refresh()
+        }, "POST")
+    }
+
+    function latencyText(n) {
+        if (n.latency > 0) return n.latency + " ms"
+        if (n.latency === 0) return ""
+        return "—"
+    }
+
     Label {
         anchors.centerIn: parent
         visible: root.nodes.length === 0
@@ -42,26 +70,59 @@ Page {
         model: root.nodes
         clip: true
 
-        delegate: ListItem.Subtitled {
-            text: modelData.name + (modelData.id === root.st.node_id ? "  ●" : "")
-            subText: modelData.type + "  " + modelData.server + ":" + modelData.port
-                     + (modelData.latency > 0 ? "   " + modelData.latency + " ms"
-                        : (modelData.latency === 0 ? "" : "   —"))
-            selected: modelData.id === root.st.node_id
-            onClicked: {
-                root.busy = root.tr("working…")
-                root.api("/nodes/select?id=" + modelData.id, function(r) {
-                    root.busy = ""
-                    root.absorb(r)
-                }, "POST")
+        delegate: ListItem {
+            id: row
+            height: units.gu(8)
+
+            onClicked: page.activate(modelData.id)
+
+            leadingActions: ListItemActions {
+                actions: [
+                    Action {
+                        iconName: "delete"
+                        text: root.tr("Delete")
+                        onTriggered: page.remove(modelData.id)
+                    }
+                ]
             }
-            // У ListItem.Subtitled нет свойства control — удаление свайпом.
-            removable: true
-            confirmRemoval: true
-            onItemRemoved: root.api("/nodes/delete?id=" + modelData.id, function(r) {
-                root.absorb(r)
-                root.refresh()
-            }, "POST")
+            trailingActions: ListItemActions {
+                actions: [
+                    Action {
+                        iconName: "edit"
+                        text: root.tr("Edit")
+                        onTriggered: page.edit(modelData)
+                    },
+                    Action {
+                        iconName: "info"
+                        text: root.tr("Test")
+                        onTriggered: root.api("/nodes/test?id=" + modelData.id, function(r) {
+                            if (r && r.nodes) root.nodes = r.nodes
+                        }, "POST")
+                    }
+                ]
+            }
+
+            ListItemLayout {
+                title.text: modelData.name
+                        + (modelData.id === root.st.node_id ? "   ●" : "")
+                subtitle.text: modelData.type + "  " + modelData.server
+                        + (modelData.port ? ":" + modelData.port : "")
+                summary.text: page.latencyText(modelData)
+                        + (modelData.sub_id ? "   " + root.tr("from subscription") : "")
+
+                // Кнопка правки видна без свайпа: свайп находят не все.
+                Icon {
+                    SlotsLayout.position: SlotsLayout.Trailing
+                    width: units.gu(2.5)
+                    height: width
+                    name: "edit"
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: units.gu(-1)
+                        onClicked: page.edit(modelData)
+                    }
+                }
+            }
         }
     }
 }

@@ -24,6 +24,12 @@ Page {
     property bool autoScan: true
     property bool macro: false
 
+    // Датчик установлен повёрнутым: на этом устройстве задняя камера сообщает
+    // orientation=270, передняя 90. Без компенсации превью лежит на боку.
+    readonly property int sensorFix: cam.position === Camera.FrontFace
+        ? (cam.orientation + 360) % 360
+        : (360 - cam.orientation) % 360
+
     header: PageHeader {
         id: hdr
         title: root.tr("Scan QR")
@@ -125,10 +131,12 @@ Page {
         anchors { top: hdr.bottom; left: parent.left; right: parent.right; bottom: panel.top }
         source: cam
         fillMode: VideoOutput.PreserveAspectCrop
-        // autoOrientation — проверенный на этом устройстве путь; ручная поправка
-        // остаётся как страховка, если платформа определит поворот неверно.
-        autoOrientation: root.qrPreviewRotation === 0
-        orientation: root.qrPreviewRotation
+        // autoOrientation на этом устройстве определяет поворот неверно
+        // (кадр стартует лежащим на боку), поэтому считаем сами:
+        // sensorFix компенсирует установку датчика, qrPreviewRotation — правка
+        // пользователя, она запоминается между запусками.
+        autoOrientation: false
+        orientation: (page.sensorFix + root.qrPreviewRotation) % 360
 
         MouseArea {
             anchors.fill: parent

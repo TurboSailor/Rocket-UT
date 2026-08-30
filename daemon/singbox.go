@@ -111,6 +111,11 @@ func nodeOutbound(n Node, tag string) (jmap, error) {
 		o["tls"] = tls
 	}
 
+	// tfo=1 из ссылки Shadowrocket: опция диалера sing-box.
+	if n.TFO {
+		o["tcp_fast_open"] = true
+	}
+
 	switch n.Network {
 	case "ws":
 		t := jmap{"type": "ws"}
