@@ -64,7 +64,7 @@ Download `rocket_<version>_all.click` and `rocketd` from a release (or build the
 then on the device:
 
 ```bash
-adb push rocket_0.1.0_all.click rocketd scripts/install.sh /home/phablet/Downloads/
+adb push rocket_0.1.1_all.click rocketd scripts/install.sh /home/phablet/Downloads/
 adb shell
 sudo bash /home/phablet/Downloads/install.sh
 ```
@@ -217,7 +217,7 @@ ran on the device itself over loopback, so it had no NAT).
 Возьмите `rocket_<версия>_all.click` и `rocketd` из релиза (или соберите — см. ниже), затем:
 
 ```bash
-adb push rocket_0.1.0_all.click rocketd scripts/install.sh /home/phablet/Downloads/
+adb push rocket_0.1.1_all.click rocketd scripts/install.sh /home/phablet/Downloads/
 adb shell
 sudo bash /home/phablet/Downloads/install.sh
 ```

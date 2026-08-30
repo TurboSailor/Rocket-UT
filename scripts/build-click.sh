@@ -3,7 +3,7 @@
 # Раскладка воспроизводит рабочий awg-control_0.2.1_all.click.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VER="${VER:-0.1.0}"
+VER="${VER:-0.1.1}"
 SRC="$ROOT/click"
 BIN="$ROOT/vendor-bin"
 OUT="$ROOT/rocket_${VER}_all.click"

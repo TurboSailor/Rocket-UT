@@ -7,7 +7,7 @@
 #   make deploy                — интерактивно: install.sh спросит пароль сам
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VER="${VER:-0.1.0}"
+VER="${VER:-0.1.1}"
 DEST=/home/phablet/Downloads
 CLICK="$ROOT/rocket_${VER}_all.click"
 

@@ -4,7 +4,7 @@ set -euo pipefail
 DIR=$(cd "$(dirname "$0")" && pwd)
 [ "$(id -u)" = 0 ] || exec sudo bash "$0" "$@"
 
-VER="${VER:-0.1.0}"
+VER="${VER:-0.1.1}"
 CLICK="$DIR/rocket_${VER}_all.click"
 [ -f "$CLICK" ] || { echo "missing $CLICK"; exit 1; }
 [ -f "$DIR/rocketd" ] || { echo "missing $DIR/rocketd"; exit 1; }
@@ -48,6 +48,14 @@ systemctl restart rocketd
 echo "== click ${VER}"
 export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/${PHABLET_UID}/bus}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${PHABLET_UID}}"
+
+# Хук desktop не перезаписывает уже сгенерированную запись, если имя файла
+# не изменилось, поэтому при переустановке той же версии лончер продолжает
+# показывать старую иконку и старый splash. Сносим устаревшие записи сами.
+PH_HOME=$(getent passwd phablet | cut -d: -f6)
+PH_HOME="${PH_HOME:-/home/phablet}"
+rm -f "$PH_HOME"/.local/share/applications/rocket_rocket_*.desktop
+rm -f "$PH_HOME"/.cache/lomiri-app-launch/desktop/rocket_rocket_*.desktop
 # Известная грабля UT: полу-установка оставляет каталог и install падает в hooks.
 if ! click install --force --allow-unauthenticated --user=phablet "$CLICK" 2>&1 | tail -5; then
   echo "-- retry after cleaning /opt/click.ubuntu.com/rocket"

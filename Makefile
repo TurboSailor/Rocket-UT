@@ -1,4 +1,4 @@
-VER := 0.1.0
+VER := 0.1.1
 export VER
 
 .PHONY: bins daemon test click deploy all
