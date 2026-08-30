@@ -1,27 +1,38 @@
 import QtQuick 2.7
-import QtQuick.Window 2.2
 import QtMultimedia 5.8
 import Ubuntu.Components 1.3
 
-// Сканер QR: кадр с камеры сохраняется в /tmp и распознаётся демоном через zxing.
+// Сканер QR.
+//
+// Резкость: на этом устройстве поддерживаются FocusContinuous и FocusMacro
+// (проверено запросом isFocusModeSupported). QR держат близко, поэтому есть
+// переключатель «Макро», точка фокуса по умолчанию — центр кадра, а тап по
+// превью наводит фокус в выбранную точку через FocusPointCustom + searchAndLock.
+// Рамка меняет цвет по lockStatus, чтобы видеть, поймал ли автофокус резкость.
+//
+// Частота: полноценный снимок (imageCapture) прерывает видоискатель и автофокус,
+// поэтому большинство тактов — быстрый и бесшумный grabToImage превью, а реальный
+// снимок делается лишь каждый 4-й такт (плотный QR в превью может не читаться).
+// Пока запрос к демону не завершён, новые такты пропускаются.
 Page {
     id: page
 
     property string result: ""
-
-    // Датчик установлен повёрнутым (на этом устройстве: задняя 270°, передняя 90°),
-    // поэтому предпросмотр надо докрутить. uiAngle учитывает поворот самого
-    // интерфейса: MainView вращается вместе с устройством.
-    readonly property int uiAngle: Screen.angleBetween(Screen.orientation,
-                                                       Screen.primaryOrientation)
-    readonly property int sensorFix: cam.position === Camera.FrontFace
-        ? (cam.orientation + uiAngle + 360) % 360
-        : (360 - cam.orientation + uiAngle) % 360
+    property bool busy: false
+    property double busyAt: 0
+    property int shots: 0
+    property bool autoScan: true
+    property bool macro: false
 
     header: PageHeader {
         id: hdr
         title: root.tr("Scan QR")
         trailingActionBar.actions: [
+            Action {
+                iconName: page.macro ? "zoom-in" : "zoom-out"
+                text: root.tr("Macro focus")
+                onTriggered: page.setMacro(!page.macro)
+            },
             Action {
                 iconName: "rotate-right"
                 text: root.tr("Rotate preview")
@@ -31,83 +42,120 @@ Page {
                 iconName: "camera-flip"
                 text: root.tr("Flip camera")
                 visible: QtMultimedia.availableCameras.length > 1
-                onTriggered: {
-                    var cams = QtMultimedia.availableCameras
-                    for (var i = 0; i < cams.length; i++) {
-                        if (cams[i].deviceId !== cam.deviceId) {
-                            cam.deviceId = cams[i].deviceId
-                            break
-                        }
-                    }
-                }
+                onTriggered: page.flipCamera()
             }
         ]
+    }
+
+    function setMacro(on) {
+        page.macro = on
+        var want = on ? Camera.FocusMacro : Camera.FocusContinuous
+        if (cam.focus.isFocusModeSupported(want))
+            cam.focus.focusMode = want
+        else if (cam.focus.isFocusModeSupported(Camera.FocusAuto))
+            cam.focus.focusMode = Camera.FocusAuto
+        page.refocus()
+    }
+
+    // refocus просит автофокус заново поискать резкость.
+    function refocus() {
+        if (cam.cameraStatus !== Camera.ActiveStatus)
+            return
+        cam.unlock()
+        cam.searchAndLock()
+    }
+
+    function focusAt(x, y) {
+        if (cam.focus.isFocusPointModeSupported(Camera.FocusPointCustom)) {
+            cam.focus.customFocusPoint = Qt.point(Math.max(0, Math.min(1, x)),
+                                                  Math.max(0, Math.min(1, y)))
+            cam.focus.focusPointMode = Camera.FocusPointCustom
+        }
+        page.refocus()
+    }
+
+    function flipCamera() {
+        var cams = QtMultimedia.availableCameras
+        for (var i = 0; i < cams.length; i++) {
+            if (cams[i].deviceId !== cam.deviceId) {
+                cam.deviceId = cams[i].deviceId
+                break
+            }
+        }
+        page.applyFocusDefaults()
+    }
+
+    function applyFocusDefaults() {
+        if (cam.focus.isFocusPointModeSupported(Camera.FocusPointCenter))
+            cam.focus.focusPointMode = Camera.FocusPointCenter
+        page.setMacro(page.macro)
     }
 
     onVisibleChanged: {
         if (visible) {
             page.result = ""
+            page.busy = false
+            page.shots = 0
+            hint.text = root.tr("point the camera at a QR code")
             msg.text = ""
-            cam.start()
-            shotTimer.running = true
-        } else {
-            shotTimer.running = false
-            cam.stop()
         }
     }
 
     Camera {
         id: cam
         captureMode: Camera.CaptureStillImage
-        focus.focusMode: Camera.FocusContinuous
+        // Жизненный цикл привязан к странице: камера не держится вне сканера.
+        cameraState: page.visible ? Camera.ActiveState : Camera.UnloadedState
+        onCameraStatusChanged: if (cameraStatus === Camera.ActiveStatus) page.applyFocusDefaults()
+        onError: msg.text = root.tr("camera") + ": " + errorString
+
         imageCapture {
-            resolution: Qt.size(1280, 720)
-            onImageSaved: root.api("/qrdecode", function(r, code) {
-                busy.running = false
-                if (r && r.text) {
-                    page.result = r.text
-                    shotTimer.running = false
-                    cam.stop()
-                    msg.text = ""
-                    return
-                }
-                // 422 — кадр без QR: это норма, продолжаем снимать.
-                if (code !== 422 && r && r.error)
-                    msg.text = r.error
-            }, "POST", path)
+            // 4:3 под сенсор: 16:9 давало обрезку и предупреждение о aspect ratio.
+            resolution: Qt.size(1600, 1200)
+            onImageSaved: page.decode(path)
+            onCaptureFailed: {
+                page.busy = false
+                msg.text = root.tr("capture failed")
+            }
         }
     }
 
     VideoOutput {
         id: view
-        anchors { top: hdr.bottom; left: parent.left; right: parent.right }
-        height: parent.height - hdr.height - panel.height
+        anchors { top: hdr.bottom; left: parent.left; right: parent.right; bottom: panel.top }
         source: cam
         fillMode: VideoOutput.PreserveAspectCrop
-        // Поправка датчика + ручная поправка пользователя (кнопка «Повернуть»).
-        orientation: (page.sensorFix + root.qrPreviewRotation) % 360
-        focus: page.visible
-    }
+        // autoOrientation — проверенный на этом устройстве путь; ручная поправка
+        // остаётся как страховка, если платформа определит поворот неверно.
+        autoOrientation: root.qrPreviewRotation === 0
+        orientation: root.qrPreviewRotation
 
-    // Периодический снимок кадра: непрерывный анализ видео в QML недоступен.
-    Timer {
-        id: shotTimer
-        interval: 1200
-        repeat: true
-        running: false
-        onTriggered: {
-            if (page.result !== "") return
-            if (cam.imageCapture.ready) {
-                busy.running = true
-                cam.imageCapture.captureToLocation("/tmp/rocket-qr-frame.png")
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                page.focusAt(mouse.x / width, mouse.y / height)
+                hint.text = root.tr("focusing…")
             }
         }
-    }
 
-    ActivityIndicator {
-        id: busy
-        anchors.centerIn: view
-        running: false
+        // Рамка прицела: цвет показывает состояние автофокуса.
+        Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(parent.width, parent.height) * 0.7
+            height: width
+            color: "transparent"
+            radius: units.gu(1)
+            border.width: units.dp(2)
+            border.color: cam.lockStatus === Camera.Locked ? UbuntuColors.green
+                        : (cam.lockStatus === Camera.Searching ? UbuntuColors.orange
+                                                               : UbuntuColors.silk)
+            opacity: 0.9
+        }
+
+        ActivityIndicator {
+            anchors { top: parent.top; right: parent.right; margins: units.gu(2) }
+            running: page.busy
+        }
     }
 
     Column {
@@ -116,18 +164,48 @@ Page {
         spacing: units.gu(1)
 
         Label {
+            id: hint
             width: parent.width
-            wrapMode: Text.WrapAnywhere
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
             fontSize: "small"
-            text: page.result !== "" ? page.result : root.tr("point the camera at a QR code")
+            text: root.tr("point the camera at a QR code")
         }
         Label {
             id: msg
             width: parent.width
+            horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
             fontSize: "small"
             color: UbuntuColors.red
         }
+        Label {
+            width: parent.width
+            wrapMode: Text.WrapAnywhere
+            fontSize: "x-small"
+            visible: page.result !== ""
+            text: page.result
+        }
+
+        Row {
+            width: parent.width
+            spacing: units.gu(1)
+            visible: page.result === ""
+
+            Button {
+                width: (parent.width - units.gu(1)) / 2
+                text: root.tr("Capture")
+                color: UbuntuColors.blue
+                enabled: !page.busy && cam.cameraStatus === Camera.ActiveStatus
+                onClicked: page.shoot(true)
+            }
+            Button {
+                width: (parent.width - units.gu(1)) / 2
+                text: page.autoScan ? root.tr("Auto: on") : root.tr("Auto: off")
+                onClicked: page.autoScan = !page.autoScan
+            }
+        }
+
         Button {
             width: parent.width
             text: root.tr("Import as node")
@@ -147,10 +225,77 @@ Page {
             visible: page.result !== ""
             onClicked: {
                 page.result = ""
-                cam.start()
-                shotTimer.running = true
+                page.busy = false
+                page.shots = 0
+                hint.text = root.tr("point the camera at a QR code")
+                page.refocus()
             }
         }
+    }
+
+    // shoot: full=true — реальный снимок (нужен для плотных QR),
+    // иначе бесшумный захват превью, который не сбивает автофокус.
+    function shoot(full) {
+        if (page.busy) {
+            // Страховка от подвисшего запроса.
+            if ((Date.now() - page.busyAt) < 2500)
+                return
+        }
+        page.busy = true
+        page.busyAt = Date.now()
+        if (full) {
+            if (cam.imageCapture.ready)
+                cam.imageCapture.captureToLocation("/tmp/rocket-qr-frame.png")
+            else
+                page.busy = false
+            return
+        }
+        view.grabToImage(function(res) {
+            if (!res) { page.busy = false; return }
+            res.saveToFile("/tmp/rocket-qr-frame.png")
+            page.decode("/tmp/rocket-qr-frame.png")
+        })
+    }
+
+    function decode(path) {
+        root.api("/qrdecode", function(r, code) {
+            page.busy = false
+            if (r && r.text) {
+                page.result = r.text
+                page.autoScan = false
+                hint.text = root.tr("QR found")
+                msg.text = ""
+                return
+            }
+            // 422 — в кадре нет QR, это нормальный ход поиска.
+            if (code !== 422 && r && r.error)
+                msg.text = r.error
+        }, "POST", path)
+    }
+
+    Timer {
+        interval: 900
+        repeat: true
+        running: page.visible && page.autoScan && page.result === ""
+                 && cam.cameraStatus === Camera.ActiveStatus
+        onTriggered: {
+            page.shots += 1
+            // Каждый 4-й такт — реальный снимок: превью может не хватить
+            // разрешения для плотного QR (например, конфига AmneziaWG).
+            page.shoot(page.shots % 4 === 0)
+            if (page.shots % 6 === 0 && page.result === "")
+                hint.text = root.tr("looking for QR…")
+        }
+    }
+
+    // Периодический повтор автофокуса: непрерывный AF на этом стеке
+    // иногда «залипает» и без нового поиска резкость не появляется.
+    Timer {
+        interval: 3000
+        repeat: true
+        running: page.visible && page.result === "" && !page.macro
+                 && cam.cameraStatus === Camera.ActiveStatus
+        onTriggered: if (cam.lockStatus !== Camera.Locked) page.refocus()
     }
 
     // looksLikeURL: подписка — это http(s)-ссылка, но http:// бывает и прокси-узлом,
