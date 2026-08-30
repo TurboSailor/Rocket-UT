@@ -15,8 +15,8 @@ camera, shows a live connection log and lets you turn any log entry into a routi
   `vmess`, `shadowsocks`, `trojan`, `socks5`, `http`, `ssh`, `amneziawg`.
 - **Shadowrocket `.conf`** — `[General]`, `[Proxy]`, `[Proxy Group]`, `[Rule]`, `[Host]`,
   including `RULE-SET` (downloaded and cached), `GEOIP`, port ranges and IDN domains.
-- **Subscriptions** — base64 blobs, plain URI lists or a remote `.conf`; refresh keeps
-  the active node and measured latencies.
+- **Subscriptions** — `sub://` share links, base64 blobs, plain URI lists or a remote
+  `.conf`; refresh keeps the active node and measured latencies.
 - **QR import** — live camera scan or QR from an image file; the decoded payload can be
   imported as node(s) or added as a subscription.
 - **Rule editing** — structured editor (add / edit / reorder / delete, order = priority)
@@ -112,7 +112,7 @@ macOS. `UT_PASS` overrides the device sudo password used by `make deploy`.
 | GET/POST | `/up`, `/down` | bring the stack up / down |
 | GET/POST | `/mode?v=config\|proxy\|direct` | routing mode |
 | GET | `/nodes` | list nodes |
-| POST | `/nodes/import?name=` | import URIs / Shadowrocket `.conf` / AmneziaWG `.conf` |
+| POST | `/nodes/import?name=` | import URIs / `sub://` links / Shadowrocket `.conf` / AmneziaWG `.conf` |
 | POST | `/nodes/select?id=`, `/nodes/delete?id=`, `/nodes/test?id=` | activate / delete / measure |
 | GET | `/subs` | list subscriptions |
 | POST | `/subs/add?name=&url=`, `/subs/update?id=`, `/subs/delete?id=` | manage subscriptions |
@@ -178,8 +178,8 @@ ran on the device itself over loopback, so it had no NAT).
 - **`.conf` Shadowrocket** — секции `[General]`, `[Proxy]`, `[Proxy Group]`, `[Rule]`,
   `[Host]`, включая `RULE-SET` (скачивается и кэшируется), `GEOIP`, диапазоны портов
   и IDN-домены.
-- **Подписки** — base64, списки ссылок или удалённый `.conf`; обновление сохраняет
-  активный узел и измеренные задержки.
+- **Подписки** — ссылки `sub://`, base64, списки ссылок или удалённый `.conf`;
+  обновление сохраняет активный узел и измеренные задержки.
 - **Импорт по QR** — сканирование камерой или QR из картинки; распознанное можно
   импортировать как узлы либо добавить как подписку.
 - **Правка правил** — структурный редактор (добавить / изменить / переставить / удалить,

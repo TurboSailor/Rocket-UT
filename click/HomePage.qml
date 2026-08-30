@@ -6,7 +6,27 @@ Page {
 
     header: PageHeader {
         id: hdr
-        title: root.tr("Rocket")
+        // Иконка приложения в заголовке: title рисует только текст,
+        // поэтому заголовок собираем сами через contents.
+        contents: Row {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: units.gu(1)
+            Image {
+                source: Qt.resolvedUrl("icon.png")
+                width: units.gu(3.5)
+                height: width
+                sourceSize.width: units.gu(3.5) * 2
+                sourceSize.height: units.gu(3.5) * 2
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Label {
+                text: root.tr("Rocket")
+                fontSize: "large"
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
         trailingActionBar.actions: [
             Action {
                 iconName: "filters"

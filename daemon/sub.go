@@ -4,17 +4,67 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
 
 var subClient = &http.Client{Timeout: 20 * time.Second}
 
-func httpGetText(url string, limit int64) (string, error) {
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+func isHTTPURL(s string) bool {
+	low := strings.ToLower(s)
+	return strings.HasPrefix(low, "http://") || strings.HasPrefix(low, "https://")
+}
+
+// parseSubLink распознаёт ссылку-подписку, а не узел:
+//
+//	sub://<base64(url)>            — формат Shadowrocket «поделиться подпиской»
+//	sub://<url>                    — часть клиентов не кодирует
+//	shadowrocket://subscribe?url=… — вариант из deeplink Shadowrocket
+//
+// Возвращает реальный http(s)-адрес подписки.
+func parseSubLink(s string) (string, bool) {
+	s = strings.TrimSpace(s)
+	low := strings.ToLower(s)
+
+	var payload string
+	switch {
+	case strings.HasPrefix(low, "sub://"):
+		payload = s[len("sub://"):]
+	case strings.HasPrefix(low, "shadowrocket://subscribe"):
+		u, err := url.Parse(s)
+		if err != nil {
+			return "", false
+		}
+		payload = u.Query().Get("url")
+	default:
+		return "", false
+	}
+
+	// Хвост #remark к адресу подписки не относится.
+	if i := strings.IndexByte(payload, '#'); i >= 0 {
+		payload = payload[:i]
+	}
+	payload = strings.TrimSpace(payload)
+	if payload == "" {
+		return "", false
+	}
+	if isHTTPURL(payload) {
+		return payload, true
+	}
+	if b, ok := b64decode(payload); ok {
+		if d := strings.TrimSpace(string(b)); isHTTPURL(d) {
+			return d, true
+		}
+	}
+	return "", false
+}
+
+func httpGetText(rawurl string, limit int64) (string, error) {
+	if !isHTTPURL(rawurl) {
 		return "", fmt.Errorf("only http(s) urls allowed")
 	}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", rawurl, nil)
 	if err != nil {
 		return "", err
 	}
@@ -41,7 +91,7 @@ func parseSubBody(body string) ([]Node, int) {
 	if text == "" {
 		return nil, 0
 	}
-	// .conf со секцией [Proxy] — берём оттуда узлы.
+	// .conf с секцией [Proxy] — берём узлы оттуда.
 	if strings.HasPrefix(text, "[") || strings.Contains(text, "[Proxy]") {
 		if c, err := ParseConf(text); err == nil && len(c.Proxies) > 0 {
 			return c.Proxies, len(c.Skipped)

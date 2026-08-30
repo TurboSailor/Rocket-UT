@@ -82,9 +82,9 @@ var D = {
         en: "Import from file or paste text below",
         ru: "Импортируйте из файла или вставьте текст ниже"
     },
-    "Supported: vless, vmess, ss, trojan, socks5, http, ssh URIs, Shadowrocket .conf, AmneziaWG .conf": {
-        en: "Supported: vless, vmess, ss, trojan, socks5, http, ssh URIs, Shadowrocket .conf, AmneziaWG .conf",
-        ru: "Поддерживается: ссылки vless, vmess, ss, trojan, socks5, http, ssh, .conf Shadowrocket, .conf AmneziaWG"
+    "Supported: vless, vmess, ss, trojan, socks5, http, ssh URIs, sub:// links, Shadowrocket .conf, AmneziaWG .conf": {
+        en: "Supported: vless, vmess, ss, trojan, socks5, http, ssh URIs, sub:// links, Shadowrocket .conf, AmneziaWG .conf",
+        ru: "Поддерживается: ссылки vless, vmess, ss, trojan, socks5, http, ssh, ссылки sub://, .conf Shadowrocket, .conf AmneziaWG"
     }
 }
 

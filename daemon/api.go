@@ -122,6 +122,28 @@ func (a *API) Routes() *http.ServeMux {
 			fail(w, 400, "read body: %v", err)
 			return
 		}
+		// sub:// — это подписка, а не узел. Однозначно, поэтому добавляем сразу:
+		// иначе вставка такой ссылки из Shadowrocket падала с «not a uri».
+		if link, ok := parseSubLink(text); ok {
+			name := strings.TrimSpace(r.URL.Query().Get("subname"))
+			if name == "" {
+				name = "sub"
+			}
+			sub := Sub{ID: id12(link), Name: name, URL: link}
+			a.st.AddSub(sub)
+			cnt, ferr := fetchSub(a.st, sub)
+			out := a.status()
+			out["subs"] = a.st.Subs()
+			out["nodes"] = a.st.Nodes()
+			out["added"] = cnt
+			out["kind"] = "subscription"
+			out["url"] = link
+			if ferr != nil {
+				out["error"] = ferr.Error()
+			}
+			reply(w, 200, out)
+			return
+		}
 		nodes, awgName, errs := importText(r.URL.Query().Get("name"), text)
 		if len(nodes) == 0 {
 			msg := "nothing importable"
@@ -198,15 +220,20 @@ func (a *API) Routes() *http.ServeMux {
 
 	mux.HandleFunc("/subs/add", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		name, url := strings.TrimSpace(q.Get("name")), strings.TrimSpace(q.Get("url"))
+		name, raw := strings.TrimSpace(q.Get("name")), strings.TrimSpace(q.Get("url"))
 		if name == "" {
 			name = "sub"
 		}
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			fail(w, 400, "url must be http(s)")
+		// Ссылку вида sub://<base64> раскрываем в реальный адрес подписки.
+		link := raw
+		if resolved, ok := parseSubLink(raw); ok {
+			link = resolved
+		}
+		if !isHTTPURL(link) {
+			fail(w, 400, "url must be http(s) or sub://<base64>")
 			return
 		}
-		sub := Sub{ID: id12(url), Name: name, URL: url}
+		sub := Sub{ID: id12(link), Name: name, URL: link}
 		a.st.AddSub(sub)
 		n, err := fetchSub(a.st, sub)
 		out := map[string]any{"subs": a.st.Subs(), "nodes": a.st.Nodes(), "count": n}

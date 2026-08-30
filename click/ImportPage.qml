@@ -37,7 +37,7 @@ Page {
                 wrapMode: Text.Wrap
                 fontSize: "x-small"
                 color: UbuntuColors.graphite
-                text: root.tr("Supported: vless, vmess, ss, trojan, socks5, http, ssh URIs, Shadowrocket .conf, AmneziaWG .conf")
+                text: root.tr("Supported: vless, vmess, ss, trojan, socks5, http, ssh URIs, sub:// links, Shadowrocket .conf, AmneziaWG .conf")
             }
 
             Button {

@@ -301,7 +301,10 @@ Page {
     // looksLikeURL: подписка — это http(s)-ссылка, но http:// бывает и прокси-узлом,
     // поэтому выбор всегда за пользователем, а не за эвристикой.
     function looksLikeURL(s) {
+        // sub:// и shadowrocket://subscribe — однозначно подписки;
+        // http(s) может быть и подпиской, и прокси-узлом, поэтому решает пользователь.
         return s.indexOf("http://") === 0 || s.indexOf("https://") === 0
+            || s.indexOf("sub://") === 0 || s.indexOf("shadowrocket://") === 0
     }
 
     function apply(as) {
