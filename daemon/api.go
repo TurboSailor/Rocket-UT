@@ -190,6 +190,11 @@ func (a *API) Routes() *http.ServeMux {
 		if edited.Name == "" {
 			edited.Name = old.Name
 		}
+		// Имя, которое приложение сгенерировало само (`тип-адрес`), следует за
+		// адресом; имя, заданное пользователем, не трогаем.
+		if edited.Name == old.Type+"-"+old.Server && edited.Server != old.Server {
+			edited.Name = edited.Type + "-" + edited.Server
+		}
 		if edited.Type == "awg" {
 			// Конфиг AmneziaWG правится как файл, а не полями узла.
 			edited.AWGConf = old.AWGConf
