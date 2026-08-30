@@ -1,0 +1,15 @@
+{
+    "architecture": "all",
+    "description": "Shadowrocket-style proxy client: vless, vmess, socks5, http, ssh, amneziawg",
+    "framework": "ubuntu-sdk-20.04",
+    "hooks": {
+        "rocket": {
+            "apparmor": "rocket.apparmor",
+            "desktop": "rocket.desktop"
+        }
+    },
+    "maintainer": "local <local@localhost>",
+    "name": "rocket",
+    "title": "Rocket",
+    "version": "0.1.0"
+}

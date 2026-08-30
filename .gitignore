@@ -1,0 +1,6 @@
+vendor-bin/
+*.click
+/build/
+.DS_Store
+daemon/rocketd
+daemon/daemon

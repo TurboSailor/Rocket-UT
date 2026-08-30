@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Rocket
+Comment=Proxy client: vless, vmess, socks5, http, ssh, amneziawg
+Exec=qmlscene %U main.qml
+Terminal=false
+Type=Application
+Icon=icon.png
+X-Lomiri-Touch=true
+X-Ubuntu-Splash-Color=#0E1621
