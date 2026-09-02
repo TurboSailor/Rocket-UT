@@ -1,6 +1,5 @@
 import QtQuick 2.7
 import Ubuntu.Components 1.3
-import Ubuntu.Components.ListItems 1.3 as ListItem
 import Ubuntu.Components.Popups 1.3 as Popups
 
 // Структурный редактор правил активного .conf: порядок в списке = приоритет.
@@ -9,25 +8,6 @@ Page {
 
     property string confName: ""
     property var rules: []
-
-    header: PageHeader {
-        id: hdr
-        title: root.tr("Rules")
-        flickable: list
-        trailingActionBar.actions: [
-            Action {
-                iconName: "add"
-                text: root.tr("Add rule")
-                onTriggered: Popups.PopupUtils.open(editDialog, page,
-                    {mode: "add", ruleType: "DOMAIN-SUFFIX", ruleArg: "", rulePolicy: "PROXY"})
-            },
-            Action {
-                iconName: "edit"
-                text: root.tr("Edit as text")
-                onTriggered: { confEdit.confName = page.confName; stack.push(confEdit) }
-            }
-        ]
-    }
 
     onVisibleChanged: if (visible) reload()
 
@@ -51,70 +31,87 @@ Page {
     }
 
     function policyColor(p) {
-        if (p === "PROXY") return UbuntuColors.blue
-        if (p === "REJECT") return UbuntuColors.red
-        return UbuntuColors.green
+        if (p === "PROXY") return pal.accent
+        if (p === "REJECT") return pal.bad
+        return pal.ok
     }
 
-    Label {
+    // Значок строки повторяет смысл политики: прокси, запрет, напрямую.
+    function policyIcon(p) {
+        if (p === "PROXY") return "globe"
+        if (p === "REJECT") return "close"
+        return "check"
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: pal.bg
+    }
+
+    RHeader {
+        id: hdr
+        title: root.tr("Rules")
+
+        RIconButton {
+            name: "plus"
+            tint: pal.accent
+            onClicked: Popups.PopupUtils.open(editDialog, page,
+                {mode: "add", ruleType: "DOMAIN-SUFFIX", ruleArg: "", rulePolicy: "PROXY"})
+        }
+        RIconButton {
+            name: "edit"
+            tint: pal.text
+            onClicked: { confEdit.confName = page.confName; stack.push(confEdit) }
+        }
+    }
+
+    REmpty {
         anchors.centerIn: parent
         visible: page.rules.length === 0
+        icon: "filter"
         text: root.tr("no rules yet")
-        color: UbuntuColors.graphite
     }
 
     ListView {
         id: list
         anchors { top: hdr.bottom; bottom: footer.top; left: parent.left; right: parent.right }
         model: page.rules
+        topMargin: pal.pad
+        bottomMargin: pal.pad
+        spacing: units.gu(1)
         clip: true
-        delegate: ListItem.Empty {
-            height: units.gu(8)
-            showDivider: true
 
-            Column {
-                anchors {
-                    left: parent.left; leftMargin: units.gu(2)
-                    right: btns.left; rightMargin: units.gu(1)
-                    verticalCenter: parent.verticalCenter
-                }
-                Label {
-                    width: parent.width
-                    elide: Text.ElideRight
-                    text: (index + 1) + ".  " + modelData.type
-                          + (modelData.type === "FINAL" ? "" : ",  " + modelData.arg)
-                }
-                Label {
-                    fontSize: "small"
-                    color: page.policyColor(modelData.policy)
-                    text: "→ " + modelData.policy
-                }
+        delegate: RRow {
+            x: pal.pad
+            width: list.width - 2 * pal.pad
+            icon: page.policyIcon(modelData.policy)
+            tint: page.policyColor(modelData.policy)
+            title: (index + 1) + ". " + modelData.type
+                   + (modelData.type === "FINAL" ? "" : ", " + modelData.arg)
+            subtitle: "→ " + modelData.policy
+
+            RIconButton {
+                name: "chevronUp"
+                tint: pal.dim
+                iconSize: units.gu(2.2)
+                enabled: index > 0
+                onClicked: root.api("/rules/move?line=" + modelData.line + "&dir=up",
+                    page.absorbRules, "POST")
             }
-
-            Row {
-                id: btns
-                anchors { right: parent.right; rightMargin: units.gu(1); verticalCenter: parent.verticalCenter }
-                spacing: units.gu(0.5)
-                Button {
-                    text: "▲"
-                    width: units.gu(3.5); height: units.gu(4)
-                    enabled: index > 0
-                    onClicked: root.api("/rules/move?line=" + modelData.line + "&dir=up",
-                        page.absorbRules, "POST")
-                }
-                Button {
-                    text: "▼"
-                    width: units.gu(3.5); height: units.gu(4)
-                    enabled: index < page.rules.length - 1
-                    onClicked: root.api("/rules/move?line=" + modelData.line + "&dir=down",
-                        page.absorbRules, "POST")
-                }
-                Button {
-                    text: "✕"
-                    width: units.gu(3.5); height: units.gu(4)
-                    onClicked: root.api("/rules/delete?line=" + modelData.line,
-                        page.absorbRules, "POST")
-                }
+            RIconButton {
+                name: "chevronDown"
+                tint: pal.dim
+                iconSize: units.gu(2.2)
+                enabled: index < page.rules.length - 1
+                onClicked: root.api("/rules/move?line=" + modelData.line + "&dir=down",
+                    page.absorbRules, "POST")
+            }
+            RIconButton {
+                name: "trash"
+                tint: pal.bad
+                iconSize: units.gu(2.2)
+                onClicked: root.api("/rules/delete?line=" + modelData.line,
+                    page.absorbRules, "POST")
             }
 
             onClicked: Popups.PopupUtils.open(editDialog, page, {
@@ -126,21 +123,23 @@ Page {
 
     Column {
         id: footer
-        anchors { bottom: parent.bottom; left: parent.left; right: parent.right; margins: units.gu(1) }
-        spacing: units.gu(0.5)
-        Label {
+        anchors {
+            bottom: parent.bottom
+            left: parent.left
+            right: parent.right
+            margins: pal.pad
+        }
+        spacing: units.gu(1)
+
+        RNote {
             id: msg
             width: parent.width
-            wrapMode: Text.Wrap
-            fontSize: "small"
-            color: UbuntuColors.red
+            tone: "bad"
         }
-        Label {
+        RNote {
             id: skipped
             width: parent.width
-            wrapMode: Text.Wrap
-            fontSize: "x-small"
-            color: UbuntuColors.orange
+            tone: "warn"
         }
     }
 
@@ -159,54 +158,102 @@ Page {
 
             title: dlg.mode === "add" ? root.tr("Add rule") : root.tr("Edit rule")
 
-            OptionSelector {
-                id: typeSel
-                model: dlg.types
-                selectedIndex: Math.max(0, dlg.types.indexOf(dlg.ruleType))
-            }
-            TextField {
-                id: argField
-                text: dlg.ruleArg
-                visible: dlg.types[typeSel.selectedIndex] !== "FINAL"
-                placeholderText: root.tr("Value")
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
-            }
-            OptionSelector {
-                id: polSel
-                model: dlg.policies
-                selectedIndex: Math.max(0, dlg.policies.indexOf(dlg.rulePolicy))
-            }
-            Label {
-                id: dlgMsg
-                wrapMode: Text.Wrap
-                fontSize: "small"
-                color: UbuntuColors.red
-            }
-            Button {
-                text: root.tr("Save")
-                color: UbuntuColors.green
-                onClicked: {
-                    var payload = JSON.stringify({
-                        type: dlg.types[typeSel.selectedIndex],
-                        arg: argField.text.trim(),
-                        policy: dlg.policies[polSel.selectedIndex]
-                    })
-                    var path = dlg.mode === "add"
-                        ? "/rules/add" : "/rules/update?line=" + dlg.line
-                    dlgMsg.text = root.tr("working…")
-                    root.api(path, function(r, code) {
-                        if (!r || r.error) {
-                            dlgMsg.text = (r && r.error) || ("HTTP " + code)
-                            return
+            Item {
+                id: body
+                width: parent ? parent.width : units.gu(34)
+                height: form.height
+
+                Column {
+                    id: form
+                    anchors { top: parent.top; left: parent.left; right: parent.right }
+                    spacing: pal.gap
+
+                    RLabel {
+                        width: parent.width
+                        section: true
+                        text: root.tr("Rule type")
+                    }
+
+                    // Семь типов в сегменты не влезают: сетка кнопок 2×N.
+                    Grid {
+                        width: parent.width
+                        columns: 2
+                        spacing: pal.gap
+
+                        Repeater {
+                            model: dlg.types
+
+                            delegate: RButton {
+                                width: (form.width - pal.gap) / 2
+                                text: modelData
+                                variant: modelData === dlg.ruleType ? "primary" : "ghost"
+                                onClicked: dlg.ruleType = modelData
+                            }
                         }
-                        page.absorbRules(r, code)
-                        Popups.PopupUtils.close(dlg)
-                    }, "POST", payload)
+                    }
+
+                    RLabel {
+                        width: parent.width
+                        visible: dlg.ruleType !== "FINAL"
+                        text: root.tr("Value")
+                    }
+                    RField {
+                        id: argField
+                        width: parent.width
+                        visible: dlg.ruleType !== "FINAL"
+                        text: dlg.ruleArg
+                        placeholderText: root.tr("Value")
+                        inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
+                    }
+
+                    RLabel {
+                        width: parent.width
+                        section: true
+                        text: root.tr("Policy")
+                    }
+                    RSegment {
+                        width: parent.width
+                        options: dlg.policies
+                        currentIndex: Math.max(0, dlg.policies.indexOf(dlg.rulePolicy))
+                        onSelected: dlg.rulePolicy = dlg.policies[index]
+                    }
+
+                    RNote {
+                        id: dlgMsg
+                        width: parent.width
+                        tone: "bad"
+                    }
+
+                    RButton {
+                        width: parent.width
+                        text: root.tr("Save")
+                        variant: "primary"
+                        onClicked: {
+                            var payload = JSON.stringify({
+                                type: dlg.ruleType,
+                                arg: argField.text.trim(),
+                                policy: dlg.rulePolicy
+                            })
+                            var path = dlg.mode === "add"
+                                ? "/rules/add" : "/rules/update?line=" + dlg.line
+                            dlgMsg.text = root.tr("working…")
+                            root.api(path, function(r, code) {
+                                if (!r || r.error) {
+                                    dlgMsg.text = (r && r.error) || ("HTTP " + code)
+                                    return
+                                }
+                                page.absorbRules(r, code)
+                                Popups.PopupUtils.close(dlg)
+                            }, "POST", payload)
+                        }
+                    }
+                    RButton {
+                        width: parent.width
+                        text: root.tr("Cancel")
+                        variant: "ghost"
+                        onClicked: Popups.PopupUtils.close(dlg)
+                    }
                 }
-            }
-            Button {
-                text: root.tr("Cancel")
-                onClicked: Popups.PopupUtils.close(dlg)
             }
         }
     }

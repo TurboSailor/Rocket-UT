@@ -12,6 +12,11 @@ MainView {
     width: units.gu(45)
     height: units.gu(75)
 
+    // Тёмная тема: SuruDark влияет на то, что рисует UITK (TextArea,
+    // ActivityIndicator, диалоги), остальное красит палитра pal.
+    theme.name: "Ubuntu.Components.Themes.SuruDark"
+    backgroundColor: pal.bg
+
     property var st: ({up: false, mode: "config"})
     property var nodes: []
     property var subs: []
@@ -23,7 +28,14 @@ MainView {
     // Ручная поправка поворота предпросмотра камеры, живёт в пределах сессии.
     property int qrPreviewRotation: 0
 
+    // Палитра и метрики; страницы видят её как `pal` через цепочку контекстов.
+    Pal { id: pal }
+
     function tr(k) { return I18n.tr(k) }
+
+    // Язык берётся из локали системы: без этого двуязычный словарь
+    // всегда отдавал английский.
+    Component.onCompleted: I18n.setLang(Qt.locale().name)
 
     // Поправка поворота кадра запоминается: подобрав её один раз,
     // пользователь не должен повторять это при каждом запуске.
@@ -87,6 +99,15 @@ MainView {
         return n.name + "  ·  " + n.type + (n.server ? "  " + n.server : "")
     }
 
+    // Цвет плашки протокола: узлы различаются на глаз без чтения подписи.
+    function typeColor(t) {
+        if (t === "vless" || t === "vmess") return pal.accent
+        if (t === "ss" || t === "trojan") return pal.violet
+        if (t === "awg") return pal.ok
+        if (t === "ssh") return pal.warn
+        return pal.dim
+    }
+
     function joinPath(dir, name) {
         if (!dir || dir === "/") return "/" + name
         return dir + "/" + name
@@ -98,8 +119,6 @@ MainView {
         repeat: true
         onTriggered: api("/status", function(r) { absorb(r) })
     }
-
-    Component.onDestruction: {}
 
     PageStack {
         id: stack

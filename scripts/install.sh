@@ -4,7 +4,7 @@ set -euo pipefail
 DIR=$(cd "$(dirname "$0")" && pwd)
 [ "$(id -u)" = 0 ] || exec sudo bash "$0" "$@"
 
-VER="${VER:-0.1.1}"
+VER="${VER:-0.2.0}"
 CLICK="$DIR/rocket_${VER}_all.click"
 [ -f "$CLICK" ] || { echo "missing $CLICK"; exit 1; }
 [ -f "$DIR/rocketd" ] || { echo "missing $DIR/rocketd"; exit 1; }

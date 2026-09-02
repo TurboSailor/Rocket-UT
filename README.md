@@ -26,6 +26,8 @@ camera, shows a live connection log and lets you turn any log entry into a routi
 - **Routing modes** — `config` (rules from `.conf`), `proxy` (everything through the node),
   `direct`.
 - **Bilingual UI** — English / Russian, picked from the system locale.
+- **Dark UI** — own component set (cards, stroke SVG icons, segmented controls),
+  sized in grid units so it scales from 32 to 60 gu wide screens.
 
 ## How it works
 
@@ -66,7 +68,7 @@ Download `rocket_<version>_all.click` and `rocketd` from a release (or build the
 then on the device:
 
 ```bash
-adb push rocket_0.1.1_all.click rocketd scripts/install.sh /home/phablet/Downloads/
+adb push rocket_0.2.0_all.click rocketd scripts/install.sh /home/phablet/Downloads/
 adb shell
 sudo bash /home/phablet/Downloads/install.sh
 ```
@@ -101,6 +103,9 @@ AWG_BIN_DIR=/path/to/prebuilt/bin make bins
 make test     # unit tests; also validates generated configs with a real sing-box
 make click    # builds rocket_<ver>_all.click (ar + tar, no click(1) needed)
 make deploy   # adb push + run install.sh on the device
+
+bash scripts/qmlcheck.sh   # QML check on the device: type resolution + layout audit
+                           # at 32/45/60 gu, no rebuild and no sudo
 ```
 
 `make click` assembles the package manually, so no `click` tool is required — handy on
@@ -191,6 +196,9 @@ ran on the device itself over loopback, so it had no NAT).
 - **Режимы маршрутизации** — `config` (правила из `.conf`), `proxy` (всё через узел),
   `direct`.
 - **Двуязычный интерфейс** — русский / английский по локали системы.
+- **Тёмный интерфейс** — собственный набор компонентов (карточки, штриховые
+  SVG-иконки, сегментированные переключатели); размеры в grid units, поэтому
+  раскладка держится от 32 до 60 gu ширины.
 
 ## Как это устроено
 
@@ -221,7 +229,7 @@ ran on the device itself over loopback, so it had no NAT).
 Возьмите `rocket_<версия>_all.click` и `rocketd` из релиза (или соберите — см. ниже), затем:
 
 ```bash
-adb push rocket_0.1.1_all.click rocketd scripts/install.sh /home/phablet/Downloads/
+adb push rocket_0.2.0_all.click rocketd scripts/install.sh /home/phablet/Downloads/
 adb shell
 sudo bash /home/phablet/Downloads/install.sh
 ```
@@ -256,6 +264,9 @@ AWG_BIN_DIR=/путь/к/бинарям make bins
 make test     # юнит-тесты; конфиги дополнительно валидируются настоящим sing-box
 make click    # собирает rocket_<версия>_all.click (ar + tar, без утилиты click)
 make deploy   # adb push и запуск install.sh на устройстве
+
+bash scripts/qmlcheck.sh   # проверка QML на устройстве: резолвинг типов и аудит
+                           # раскладки на 32/45/60 gu, без пересборки и sudo
 ```
 
 `make click` собирает пакет вручную, поэтому утилита `click` не требуется — это удобно на

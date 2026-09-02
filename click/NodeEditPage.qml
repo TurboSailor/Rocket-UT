@@ -1,30 +1,15 @@
 import QtQuick 2.7
 import Ubuntu.Components 1.3
 
-// Правка добавленного узла. Поля показываются по типу узла.
+// Правка добавленного узла. Поля показываются по типу узла и собраны
+// в секции-карточки: пустая секция целиком схлопывается в нулевую высоту.
 // Конфиг AmneziaWG правится как файл, поэтому у awg-узла адрес только читается.
 Page {
     id: page
 
     property var node: ({})
-
-    header: PageHeader {
-        id: hdr
-        title: root.tr("Edit node")
-        flickable: flick
-        trailingActionBar.actions: [
-            Action {
-                iconName: "save"
-                text: root.tr("Save")
-                onTriggered: page.save()
-            },
-            Action {
-                iconName: "delete"
-                text: root.tr("Delete")
-                onTriggered: page.remove()
-            }
-        ]
-    }
+    // Тон плашки msg: обычно ошибка, для удачного замера — информационный.
+    property string msgTone: "bad"
 
     onVisibleChanged: if (visible) page.load()
 
@@ -74,6 +59,7 @@ Page {
             tls: tlsSwitch.checked,
             insecure: insecureSwitch.checked
         }
+        page.msgTone = "bad"
         msg.text = root.tr("working…")
         root.api("/nodes/update?id=" + node.id, function(r, code) {
             if (!r || r.error) {
@@ -88,6 +74,7 @@ Page {
     }
 
     function remove() {
+        page.msgTone = "bad"
         msg.text = root.tr("working…")
         root.api("/nodes/delete?id=" + node.id, function(r, code) {
             if (!r || r.error) {
@@ -101,6 +88,52 @@ Page {
         }, "POST")
     }
 
+    // Замер задержки только этого узла: демон возвращает весь список,
+    // из него берём свою запись и показываем её латентность в плашке.
+    function test() {
+        page.msgTone = "bad"
+        msg.text = root.tr("testing…")
+        root.api("/nodes/test?id=" + node.id, function(r, code) {
+            if (!r || r.error) {
+                msg.text = (r && r.error) || ("HTTP " + code)
+                return
+            }
+            if (r && r.nodes) root.nodes = r.nodes
+            var mine = null
+            var list = r.nodes || []
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].id === node.id) { mine = list[i]; break }
+            }
+            if (mine && mine.latency > 0) {
+                page.msgTone = "info"
+                msg.text = mine.latency + " ms"
+                return
+            }
+            msg.text = root.tr("node unreachable")
+        }, "POST")
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: pal.bg
+    }
+
+    RHeader {
+        id: hdr
+        title: root.tr("Edit node")
+
+        RIconButton {
+            name: "check"
+            tint: pal.ok
+            onClicked: page.save()
+        }
+        RIconButton {
+            name: "trash"
+            tint: pal.bad
+            onClicked: page.remove()
+        }
+    }
+
     Flickable {
         id: flick
         anchors { top: hdr.bottom; bottom: parent.bottom; left: parent.left; right: parent.right }
@@ -110,141 +143,292 @@ Page {
 
         Column {
             id: col
-            width: parent.width - units.gu(4)
-            anchors { top: parent.top; topMargin: units.gu(1); horizontalCenter: parent.horizontalCenter }
-            spacing: units.gu(1)
-
-            Label {
-                width: parent.width
-                fontSize: "small"
-                color: UbuntuColors.graphite
-                text: (node.type || "") + (node.sub_id ? "  ·  " + root.tr("from subscription") : "")
+            anchors {
+                top: parent.top; topMargin: pal.pad
+                left: parent.left; leftMargin: pal.pad
+                right: parent.right; rightMargin: pal.pad
             }
-            Label {
+            spacing: pal.gap
+
+            RLabel {
                 width: parent.width
-                wrapMode: Text.Wrap
-                fontSize: "x-small"
-                color: UbuntuColors.orange
-                visible: node.sub_id !== undefined && node.sub_id !== ""
-                text: root.tr("editing detaches the node from its subscription")
+                text: (node.type || "")
+                      + (node.sub_id ? "  ·  " + root.tr("from subscription") : "")
             }
 
-            Label { text: root.tr("Name"); fontSize: "small" }
-            TextField {
-                id: nameField
+            RNote {
                 width: parent.width
-                inputMethodHints: Qt.ImhNoPredictiveText
+                tone: "warn"
+                text: (node.sub_id !== undefined && node.sub_id !== "")
+                      ? root.tr("editing detaches the node from its subscription") : ""
             }
 
-            Label { text: root.tr("Server"); fontSize: "small"; visible: !page.isAwg() }
-            TextField {
-                id: serverField
+            // --- основное ---
+            RCard {
                 width: parent.width
-                visible: !page.isAwg()
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
-            }
+                height: visible ? basics.height + units.gu(3) : 0
 
-            Label { text: root.tr("Port"); fontSize: "small"; visible: !page.isAwg() }
-            TextField {
-                id: portField
-                width: parent.width
-                visible: !page.isAwg()
-                inputMethodHints: Qt.ImhDigitsOnly
-            }
+                Column {
+                    id: basics
+                    anchors {
+                        top: parent.top; topMargin: units.gu(1.5)
+                        left: parent.left; leftMargin: units.gu(1.5)
+                        right: parent.right; rightMargin: units.gu(1.5)
+                    }
+                    spacing: pal.gap
 
-            Label { text: root.tr("Username"); fontSize: "small"; visible: page.needsCreds() }
-            TextField {
-                id: userField
-                width: parent.width
-                visible: page.needsCreds()
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
-            }
+                    RLabel {
+                        width: parent.width
+                        section: true
+                        text: root.tr("Basics")
+                    }
 
-            Label { text: root.tr("Password"); fontSize: "small"; visible: page.needsPassword() }
-            TextField {
-                id: passField
-                width: parent.width
-                visible: page.needsPassword()
-                echoMode: TextInput.Normal
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
-            }
+                    Column {
+                        width: parent.width
+                        spacing: units.gu(0.75)
 
-            Label { text: "UUID"; fontSize: "small"; visible: page.needsUUID() }
-            TextField {
-                id: uuidField
-                width: parent.width
-                visible: page.needsUUID()
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
-            }
+                        RLabel { width: parent.width; text: root.tr("Name") }
+                        RField {
+                            id: nameField
+                            width: parent.width
+                            inputMethodHints: Qt.ImhNoPredictiveText
+                        }
+                    }
 
-            Label { text: root.tr("Method"); fontSize: "small"; visible: page.needsMethod() }
-            TextField {
-                id: methodField
-                width: parent.width
-                visible: page.needsMethod()
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
-            }
+                    Column {
+                        width: parent.width
+                        spacing: units.gu(0.75)
+                        visible: !page.isAwg()
 
-            Label { text: "SNI"; fontSize: "small"; visible: page.needsTransport() }
-            TextField {
-                id: sniField
-                width: parent.width
-                visible: page.needsTransport()
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
-            }
+                        RLabel { width: parent.width; text: root.tr("Server") }
+                        RField {
+                            id: serverField
+                            width: parent.width
+                            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
+                        }
+                    }
 
-            Label { text: root.tr("Path"); fontSize: "small"; visible: page.needsTransport() }
-            TextField {
-                id: pathField
-                width: parent.width
-                visible: page.needsTransport()
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
-            }
+                    Column {
+                        width: parent.width
+                        spacing: units.gu(0.75)
+                        visible: !page.isAwg()
 
-            Label { text: root.tr("Host header"); fontSize: "small"; visible: page.needsTransport() }
-            TextField {
-                id: hostField
-                width: parent.width
-                visible: page.needsTransport()
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
-            }
-
-            Row {
-                width: parent.width
-                spacing: units.gu(1)
-                visible: !page.isAwg()
-                Switch { id: tlsSwitch }
-                Label { text: "TLS"; anchors.verticalCenter: parent.verticalCenter }
-            }
-            Row {
-                width: parent.width
-                spacing: units.gu(1)
-                visible: tlsSwitch.checked && !page.isAwg()
-                Switch { id: insecureSwitch }
-                Label {
-                    text: root.tr("Skip cert check")
-                    anchors.verticalCenter: parent.verticalCenter
+                        RLabel { width: parent.width; text: root.tr("Port") }
+                        RField {
+                            id: portField
+                            width: parent.width
+                            inputMethodHints: Qt.ImhDigitsOnly
+                        }
+                    }
                 }
             }
 
-            Label {
-                id: msg
+            // --- доступ ---
+            RCard {
                 width: parent.width
-                wrapMode: Text.Wrap
-                fontSize: "small"
-                color: UbuntuColors.red
+                visible: page.needsCreds() || page.needsPassword()
+                         || page.needsUUID() || page.needsMethod()
+                height: visible ? access.height + units.gu(3) : 0
+
+                Column {
+                    id: access
+                    anchors {
+                        top: parent.top; topMargin: units.gu(1.5)
+                        left: parent.left; leftMargin: units.gu(1.5)
+                        right: parent.right; rightMargin: units.gu(1.5)
+                    }
+                    spacing: pal.gap
+
+                    RLabel {
+                        width: parent.width
+                        section: true
+                        text: root.tr("Access")
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: units.gu(0.75)
+                        visible: page.needsCreds()
+
+                        RLabel { width: parent.width; text: root.tr("Username") }
+                        RField {
+                            id: userField
+                            width: parent.width
+                            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+                        }
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: units.gu(0.75)
+                        visible: page.needsPassword()
+
+                        RLabel { width: parent.width; text: root.tr("Password") }
+                        RField {
+                            id: passField
+                            width: parent.width
+                            echoMode: TextInput.Normal
+                            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+                        }
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: units.gu(0.75)
+                        visible: page.needsUUID()
+
+                        RLabel { width: parent.width; text: "UUID" }
+                        RField {
+                            id: uuidField
+                            width: parent.width
+                            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+                        }
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: units.gu(0.75)
+                        visible: page.needsMethod()
+
+                        RLabel { width: parent.width; text: root.tr("Method") }
+                        RField {
+                            id: methodField
+                            width: parent.width
+                            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
+                        }
+                    }
+                }
             }
 
-            Button {
+            // --- транспорт ---
+            RCard {
                 width: parent.width
+                visible: page.needsTransport() || !page.isAwg()
+                height: visible ? transport.height + units.gu(3) : 0
+
+                Column {
+                    id: transport
+                    anchors {
+                        top: parent.top; topMargin: units.gu(1.5)
+                        left: parent.left; leftMargin: units.gu(1.5)
+                        right: parent.right; rightMargin: units.gu(1.5)
+                    }
+                    spacing: pal.gap
+
+                    RLabel {
+                        width: parent.width
+                        section: true
+                        text: root.tr("Transport")
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: units.gu(0.75)
+                        visible: page.needsTransport()
+
+                        RLabel { width: parent.width; text: "SNI" }
+                        RField {
+                            id: sniField
+                            width: parent.width
+                            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
+                        }
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: units.gu(0.75)
+                        visible: page.needsTransport()
+
+                        RLabel { width: parent.width; text: root.tr("Path") }
+                        RField {
+                            id: pathField
+                            width: parent.width
+                            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+                        }
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: units.gu(0.75)
+                        visible: page.needsTransport()
+
+                        RLabel { width: parent.width; text: root.tr("Host header") }
+                        RField {
+                            id: hostField
+                            width: parent.width
+                            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
+                        }
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: units.gu(3.4)
+                        visible: !page.isAwg()
+
+                        RSwitch {
+                            id: tlsSwitch
+                            anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                        }
+                        Text {
+                            anchors {
+                                left: tlsSwitch.right; leftMargin: units.gu(1.5)
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: "TLS"
+                            color: pal.text
+                            font.pixelSize: pal.fsBody
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: units.gu(3.4)
+                        visible: tlsSwitch.checked && !page.isAwg()
+
+                        RSwitch {
+                            id: insecureSwitch
+                            anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                        }
+                        Text {
+                            anchors {
+                                left: insecureSwitch.right; leftMargin: units.gu(1.5)
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: root.tr("Skip cert check")
+                            color: pal.text
+                            font.pixelSize: pal.fsBody
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+
+            RNote {
+                id: msg
+                width: parent.width
+                tone: page.msgTone
+            }
+
+            RButton {
+                width: parent.width
+                variant: "ghost"
+                icon: "refresh"
+                text: root.tr("Test")
+                onClicked: page.test()
+            }
+            RButton {
+                width: parent.width
+                variant: "primary"
                 text: root.tr("Save")
-                color: UbuntuColors.green
                 onClicked: page.save()
             }
-            Button {
+            RButton {
                 width: parent.width
+                variant: "danger"
                 text: root.tr("Delete")
-                color: UbuntuColors.red
                 onClicked: page.remove()
             }
         }

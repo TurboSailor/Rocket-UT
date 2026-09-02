@@ -1,24 +1,29 @@
 import QtQuick 2.7
 import Ubuntu.Components 1.3
-import Ubuntu.Components.ListItems 1.3 as ListItem
 
+// Файловый выбор: каталоги сверху, файлы ниже; тап по файлу отдаёт его
+// демону (распознать QR, прочитать текст) в зависимости от root.pendingFile.
 Page {
     id: page
 
-    header: PageHeader {
+    onVisibleChanged: if (visible) dirModel.load()
+
+    Rectangle {
+        anchors.fill: parent
+        color: pal.bg
+    }
+
+    RHeader {
         id: hdr
         title: dirModel.cur
-        flickable: fileList
-        trailingActionBar.actions: [
-            Action {
-                iconName: "up"
-                text: root.tr("Up")
-                enabled: dirModel.cur !== "/home/phablet" && dirModel.cur !== "/"
-                onTriggered: dirModel.up()
-            }
-        ]
+
+        RIconButton {
+            name: "chevronUp"
+            tint: pal.text
+            enabled: dirModel.cur !== "/home/phablet" && dirModel.cur !== "/"
+            onClicked: dirModel.up()
+        }
     }
-    onVisibleChanged: if (visible) dirModel.load()
 
     ListModel {
         id: dirModel
@@ -46,11 +51,20 @@ Page {
 
     ListView {
         id: fileList
-        anchors { top: hdr.bottom; bottom: parent.bottom; left: parent.left; right: parent.right }
+        anchors { top: hdr.bottom; bottom: msg.top; left: parent.left; right: parent.right }
         model: dirModel
+        topMargin: pal.pad
+        bottomMargin: pal.pad
+        spacing: units.gu(1)
         clip: true
-        delegate: ListItem.Standard {
-            text: (model.isDir ? "📁  " : "📄  ") + model.name
+
+        delegate: RRow {
+            x: pal.pad
+            width: fileList.width - 2 * pal.pad
+            icon: model.isDir ? "folder" : "file"
+            tint: model.isDir ? pal.warn : pal.accent
+            title: model.name
+            chevron: model.isDir
             onClicked: {
                 if (model.isDir) {
                     dirModel.cur = model.path
@@ -91,11 +105,9 @@ Page {
         }
     }
 
-    Label {
+    RNote {
         id: msg
-        anchors { bottom: parent.bottom; left: parent.left; right: parent.right; margins: units.gu(2) }
-        wrapMode: Text.Wrap
-        fontSize: "small"
-        color: UbuntuColors.red
+        anchors { bottom: parent.bottom; left: parent.left; right: parent.right; margins: pal.pad }
+        tone: "bad"
     }
 }

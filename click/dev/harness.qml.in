@@ -1,0 +1,95 @@
+import QtQuick 2.7
+import Ubuntu.Components 1.3
+
+// Харнесс проверки QML на устройстве: scripts/qmlcheck.sh подставляет
+// @PAGE@ и @WIDTH@ и гоняет это под QT_QPA_PLATFORM=offscreen.
+// Корень — обычный Item: под MainView процесс выходит до срабатывания Timer.
+Item {
+    id: root
+    width: units.gu(@WIDTH@)
+    height: units.gu(100)
+
+    Pal { id: pal }
+
+    // --- заглушки состояния main.qml ---
+    property var st: ({
+        up: true, mode: "config", node_id: "n1",
+        node: {name: "amsterdam-vless-reality-long", type: "vless", server: "203.0.113.10", port: 443},
+        rx: 123456789, tx: 987654, handshake_age: 17,
+        skipped: ["USER-AGENT,Mozilla*", "URL-REGEX,^https://ads"]
+    })
+    property var nodes: [
+        {id: "n1", name: "amsterdam-vless-reality-very-long-name", type: "vless",
+         server: "203.0.113.10", port: 443, latency: 84},
+        {id: "n2", name: "tokyo", type: "awg", server: "198.51.100.7", port: 51820,
+         latency: 0, sub_id: "s1"},
+        {id: "n3", name: "home-ssh", type: "ssh", server: "192.0.2.1", port: 22, latency: 512}
+    ]
+    property var subs: [{id: "s1", name: "main subscription with a long title",
+                         count: 42, updated_at: 1735689600, err: ""}]
+    property var confs: ["shadowrocket", "ru-direct"]
+    property string busy: ""
+    property string startDir: "/home/phablet/Downloads"
+    property string pendingFile: "import"
+    property int qrPreviewRotation: 0
+
+    function tr(k) { return k }
+    function api(path, cb, method, body) { }
+    function absorb(r) { }
+    function refresh() { }
+    function fmtBytes(b) { return b === undefined ? "—" : (b + " B") }
+    function fmtAgo(ts) { return "5m" }
+    function fmtTime(ts) { return "12:34:56" }
+    function nodeLabel(n) { return n.name + "  ·  " + n.type + "  " + n.server }
+    function typeColor(t) { return t === "awg" ? pal.ok : pal.accent }
+    function joinPath(d, n) { return d + "/" + n }
+
+    // --- заглушки навигации ---
+    QtObject {
+        id: stack
+        function push(p) { }
+        function pop() { }
+    }
+    Item { id: home }
+    Item { id: nodesPage }
+    Item { id: nodeEdit; property var node: ({type: "vless", name: "n", server: "s", port: 443}) }
+    Item { id: subsPage }
+    Item { id: confsPage; function reload() { } }
+    Item { id: rulesPage; property string confName: "" }
+    Item { id: logPage }
+    Item { id: importPage; function setText(t) { } }
+    Item { id: scanPage }
+    Item { id: filePage }
+    Item { id: confEdit; property string confName: "" }
+
+    Loader {
+        id: ld
+        anchors.fill: parent
+        source: "@PAGE@.qml"
+    }
+
+    // Аудит раскладки: уехавшие за экран элементы видно без скриншота.
+    function walk(item) {
+        for (var i = 0; i < item.children.length; i++) {
+            var c = item.children[i]
+            if (c.visible === false || c.width === undefined) continue
+            if (c.width < 0)
+                console.log("NEGATIVE-WIDTH @PAGE@ @WIDTH@gu", c)
+            var p = c.mapToItem(root, 0, 0)
+            if (p.x < -0.5 || p.x + c.width > root.width + 0.5)
+                console.log("OVERFLOW @PAGE@ @WIDTH@gu", c,
+                            "x=" + p.x.toFixed(1), "w=" + c.width.toFixed(1))
+            walk(c)
+        }
+    }
+
+    Timer {
+        interval: 900
+        running: true
+        onTriggered: {
+            root.walk(root)
+            console.log("CHECKED @PAGE@ @WIDTH@gu")
+            Qt.quit()
+        }
+    }
+}

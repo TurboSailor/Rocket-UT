@@ -1,22 +1,12 @@
 import QtQuick 2.7
 import Ubuntu.Components 1.3
 
+// Правка текста конфига: сводка разбора, ошибки, моноширинный редактор
+// и список строк, которые демон не понял.
 Page {
     id: page
     property string confName: ""
 
-    header: PageHeader {
-        id: hdr
-        title: root.tr("Edit config") + (page.confName ? ": " + page.confName : "")
-        flickable: flick
-        trailingActionBar.actions: [
-            Action {
-                iconName: "save"
-                text: root.tr("Save")
-                onTriggered: page.save()
-            }
-        ]
-    }
     onVisibleChanged: if (visible && page.confName !== "") load()
 
     function load() {
@@ -44,6 +34,22 @@ Page {
         }, "POST", area.text)
     }
 
+    Rectangle {
+        anchors.fill: parent
+        color: pal.bg
+    }
+
+    RHeader {
+        id: hdr
+        title: root.tr("Edit config") + (page.confName ? ": " + page.confName : "")
+
+        RIconButton {
+            name: "check"
+            tint: pal.ok
+            onClicked: page.save()
+        }
+    }
+
     Flickable {
         id: flick
         anchors { top: hdr.bottom; bottom: parent.bottom; left: parent.left; right: parent.right }
@@ -53,33 +59,63 @@ Page {
 
         Column {
             id: col
-            width: parent.width - units.gu(3)
-            anchors { top: parent.top; topMargin: units.gu(1); horizontalCenter: parent.horizontalCenter }
-            spacing: units.gu(1)
+            anchors {
+                top: parent.top; topMargin: pal.pad
+                left: parent.left; leftMargin: pal.pad
+                right: parent.right; rightMargin: pal.pad
+            }
+            spacing: pal.gap
 
-            Label { id: info; width: parent.width; fontSize: "small"; wrapMode: Text.Wrap }
-            Label { id: msg; width: parent.width; fontSize: "small"; color: UbuntuColors.red; wrapMode: Text.Wrap }
-
-            TextArea {
-                id: area
+            RNote {
+                id: info
                 width: parent.width
-                height: units.gu(40)
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
-                placeholderText: "[General]\nipv6 = false\n\n[Rule]\nFINAL,DIRECT"
+                tone: "info"
+            }
+            RNote {
+                id: msg
+                width: parent.width
+                tone: "bad"
             }
 
-            Label {
+            // --- редактор ---
+            RCard {
                 width: parent.width
-                text: root.tr("unsupported lines")
-                font.bold: true
+                height: area.height + units.gu(2)
+
+                TextArea {
+                    id: area
+                    anchors {
+                        left: parent.left; leftMargin: units.gu(1)
+                        right: parent.right; rightMargin: units.gu(1)
+                        verticalCenter: parent.verticalCenter
+                    }
+                    height: units.gu(40)
+                    color: pal.text
+                    font.family: "Ubuntu Mono"
+                    font.pixelSize: pal.fsSmall
+                    inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+                    placeholderText: "[General]\nipv6 = false\n\n[Rule]\nFINAL,DIRECT"
+                }
+            }
+
+            // --- строки, которые демон не понял ---
+            RLabel {
+                width: parent.width
+                section: true
                 visible: skippedLabel.text !== ""
+                text: root.tr("unsupported lines")
             }
-            Label {
+            RNote {
                 id: skippedLabel
                 width: parent.width
-                wrapMode: Text.Wrap
-                fontSize: "x-small"
-                color: UbuntuColors.orange
+                tone: "warn"
+            }
+
+            RButton {
+                width: parent.width
+                variant: "primary"
+                text: root.tr("Save")
+                onClicked: page.save()
             }
         }
     }

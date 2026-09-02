@@ -3,7 +3,7 @@
 # Раскладка воспроизводит рабочий awg-control_0.2.1_all.click.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VER="${VER:-0.1.1}"
+VER="${VER:-0.2.0}"
 SRC="$ROOT/click"
 BIN="$ROOT/vendor-bin"
 OUT="$ROOT/rocket_${VER}_all.click"
@@ -17,7 +17,7 @@ done
 # --- data ---
 D="$WORK/data"
 mkdir -p "$D/bin"
-cp "$SRC"/*.qml "$SRC"/i18n.js "$SRC/rocket.desktop" "$SRC/rocket.apparmor" "$D/"
+cp "$SRC"/*.qml "$SRC"/*.js "$SRC/rocket.desktop" "$SRC/rocket.apparmor" "$D/"
 cp "$SRC/icon.png" "$D/icon.png"
 # Штатный шаблон правил: демон сидирует его на чистой установке.
 cp "$SRC/default.conf" "$D/default.conf"
@@ -25,7 +25,7 @@ install -m 755 "$BIN/sing-box" "$D/bin/sing-box"
 install -m 755 "$BIN/amneziawg-go" "$D/bin/amneziawg-go"
 install -m 755 "$BIN/awg" "$D/bin/awg"
 install -m 755 "$BIN/zxing" "$D/bin/zxing"
-chmod 644 "$D"/*.qml "$D"/i18n.js "$D"/rocket.desktop "$D"/rocket.apparmor "$D"/icon.png "$D"/default.conf
+chmod 644 "$D"/*.qml "$D"/*.js "$D"/rocket.desktop "$D"/rocket.apparmor "$D"/icon.png "$D"/default.conf
 
 INSTALLED_KB=$(du -sk "$D" | awk '{print $1}')
 

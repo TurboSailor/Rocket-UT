@@ -1,35 +1,10 @@
 import QtQuick 2.7
 import Ubuntu.Components 1.3
 
-// Список узлов. Тап — активировать; свайп влево — правка и удаление
-// (ListItem из Ubuntu.Components 1.3, а не ListItems.Subtitled: у последнего
-// нет ни actions, ни свойства control).
+// Список узлов. Тап по строке активирует узел, правка и удаление вынесены
+// в явные кнопки строки: свайп-действия UITK находят не все.
 Page {
     id: page
-
-    header: PageHeader {
-        id: hdr
-        title: root.tr("Nodes")
-        flickable: list
-        trailingActionBar.actions: [
-            Action {
-                iconName: "add"
-                text: root.tr("Import")
-                onTriggered: stack.push(importPage)
-            },
-            Action {
-                iconName: "reload"
-                text: root.tr("Test all")
-                onTriggered: {
-                    root.busy = root.tr("testing…")
-                    root.api("/nodes/test", function(r) {
-                        root.busy = ""
-                        if (r && r.nodes) root.nodes = r.nodes
-                    }, "POST")
-                }
-            }
-        ]
-    }
 
     function activate(id) {
         root.busy = root.tr("working…")
@@ -57,71 +32,92 @@ Page {
         return "—"
     }
 
-    Label {
+    // Цвет латентности: быстрый узел виден на глаз, мёртвый — приглушён.
+    function latencyColor(n) {
+        if (n.latency > 0) {
+            if (n.latency < 150) return pal.ok
+            if (n.latency < 400) return pal.warn
+            return pal.dim
+        }
+        if (n.latency === 0) return pal.dim
+        return pal.faint
+    }
+
+    function nodeIcon(t) {
+        if (t === "ssh") return "terminal"
+        if (t === "awg") return "shield"
+        if (t === "socks5" || t === "http") return "globe"
+        return "server"
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: pal.bg
+    }
+
+    RHeader {
+        id: hdr
+        title: root.tr("Nodes")
+
+        RIconButton {
+            name: "plus"
+            tint: pal.text
+            onClicked: stack.push(importPage)
+        }
+        RIconButton {
+            name: "refresh"
+            tint: pal.text
+            onClicked: {
+                root.busy = root.tr("testing…")
+                root.api("/nodes/test", function(r) {
+                    root.busy = ""
+                    if (r && r.nodes) root.nodes = r.nodes
+                }, "POST")
+            }
+        }
+    }
+
+    REmpty {
         anchors.centerIn: parent
         visible: root.nodes.length === 0
+        icon: "server"
         text: root.tr("no nodes yet")
-        color: UbuntuColors.graphite
     }
 
     ListView {
         id: list
         anchors { top: hdr.bottom; bottom: parent.bottom; left: parent.left; right: parent.right }
         model: root.nodes
+        topMargin: pal.pad
+        bottomMargin: pal.pad
+        spacing: units.gu(1)
         clip: true
 
-        delegate: ListItem {
-            id: row
-            height: units.gu(8)
+        delegate: RRow {
+            x: pal.pad
+            width: list.width - 2 * pal.pad
+
+            icon: page.nodeIcon(modelData.type)
+            tint: root.typeColor(modelData.type)
+            title: modelData.name
+            subtitle: modelData.type + "  " + modelData.server
+                    + (modelData.port ? ":" + modelData.port : "")
+                    + (modelData.sub_id ? "  ·  " + root.tr("from subscription") : "")
+            value: page.latencyText(modelData)
+            valueColor: page.latencyColor(modelData)
+            active: modelData.id === root.st.node_id
 
             onClicked: page.activate(modelData.id)
 
-            leadingActions: ListItemActions {
-                actions: [
-                    Action {
-                        iconName: "delete"
-                        text: root.tr("Delete")
-                        onTriggered: page.remove(modelData.id)
-                    }
-                ]
+            RIconButton {
+                name: "edit"
+                tint: pal.dim
+                onClicked: page.edit(modelData)
             }
-            trailingActions: ListItemActions {
-                actions: [
-                    Action {
-                        iconName: "edit"
-                        text: root.tr("Edit")
-                        onTriggered: page.edit(modelData)
-                    },
-                    Action {
-                        iconName: "info"
-                        text: root.tr("Test")
-                        onTriggered: root.api("/nodes/test?id=" + modelData.id, function(r) {
-                            if (r && r.nodes) root.nodes = r.nodes
-                        }, "POST")
-                    }
-                ]
-            }
-
-            ListItemLayout {
-                title.text: modelData.name
-                        + (modelData.id === root.st.node_id ? "   ●" : "")
-                subtitle.text: modelData.type + "  " + modelData.server
-                        + (modelData.port ? ":" + modelData.port : "")
-                summary.text: page.latencyText(modelData)
-                        + (modelData.sub_id ? "   " + root.tr("from subscription") : "")
-
-                // Кнопка правки видна без свайпа: свайп находят не все.
-                Icon {
-                    SlotsLayout.position: SlotsLayout.Trailing
-                    width: units.gu(2.5)
-                    height: width
-                    name: "edit"
-                    MouseArea {
-                        anchors.fill: parent
-                        anchors.margins: units.gu(-1)
-                        onClicked: page.edit(modelData)
-                    }
-                }
+            RIconButton {
+                name: "trash"
+                tint: pal.bad
+                onClicked: page.remove(modelData.id)
             }
         }
     }

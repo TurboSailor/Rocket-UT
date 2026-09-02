@@ -30,27 +30,31 @@ Page {
         ? (cam.orientation + 360) % 360
         : (360 - cam.orientation) % 360
 
-    header: PageHeader {
+    Rectangle {
+        anchors.fill: parent
+        color: pal.bg
+    }
+
+    RHeader {
         id: hdr
         title: root.tr("Scan QR")
-        trailingActionBar.actions: [
-            Action {
-                iconName: page.macro ? "zoom-in" : "zoom-out"
-                text: root.tr("Macro focus")
-                onTriggered: page.setMacro(!page.macro)
-            },
-            Action {
-                iconName: "rotate-right"
-                text: root.tr("Rotate preview")
-                onTriggered: root.qrPreviewRotation = (root.qrPreviewRotation + 90) % 360
-            },
-            Action {
-                iconName: "camera-flip"
-                text: root.tr("Flip camera")
-                visible: QtMultimedia.availableCameras.length > 1
-                onTriggered: page.flipCamera()
-            }
-        ]
+
+        RIconButton {
+            name: page.macro ? "zoomIn" : "zoomOut"
+            tint: page.macro ? pal.accent : pal.text
+            onClicked: page.setMacro(!page.macro)
+        }
+        RIconButton {
+            name: "rotate"
+            tint: pal.text
+            onClicked: root.qrPreviewRotation = (root.qrPreviewRotation + 90) % 360
+        }
+        RIconButton {
+            name: "flip"
+            tint: pal.text
+            visible: QtMultimedia.availableCameras.length > 1
+            onClicked: page.flipCamera()
+        }
     }
 
     function setMacro(on) {
@@ -154,9 +158,9 @@ Page {
             color: "transparent"
             radius: units.gu(1)
             border.width: units.dp(2)
-            border.color: cam.lockStatus === Camera.Locked ? UbuntuColors.green
-                        : (cam.lockStatus === Camera.Searching ? UbuntuColors.orange
-                                                               : UbuntuColors.silk)
+            border.color: cam.lockStatus === Camera.Locked ? pal.ok
+                        : (cam.lockStatus === Camera.Searching ? pal.warn
+                           : Qt.rgba(pal.text.r, pal.text.g, pal.text.b, 0.55))
             opacity: 0.9
         }
 
@@ -166,77 +170,108 @@ Page {
         }
     }
 
-    Column {
+    // Нижняя панель: полупрозрачная подложка поверх кадра, скруглённая сверху
+    // (нижние углы уводятся за край экрана отрицательным отступом).
+    Rectangle {
         id: panel
-        anchors { bottom: parent.bottom; left: parent.left; right: parent.right; margins: units.gu(2) }
-        spacing: units.gu(1)
+        anchors {
+            bottom: parent.bottom
+            bottomMargin: -pal.radius
+            left: parent.left
+            right: parent.right
+        }
+        height: pcol.height + 2 * pal.pad + pal.radius
+        radius: pal.radius
+        color: Qt.rgba(pal.bg.r, pal.bg.g, pal.bg.b, 0.92)
+        border.width: 1
+        border.color: pal.border
 
-        Label {
-            id: hint
-            width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.Wrap
-            fontSize: "small"
-            text: root.tr("point the camera at a QR code")
-        }
-        Label {
-            id: msg
-            width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.Wrap
-            fontSize: "small"
-            color: UbuntuColors.red
-        }
-        Label {
-            width: parent.width
-            wrapMode: Text.WrapAnywhere
-            fontSize: "x-small"
-            visible: page.result !== ""
-            text: page.result
-        }
-
-        Row {
-            width: parent.width
+        Column {
+            id: pcol
+            anchors {
+                top: parent.top; topMargin: pal.pad
+                left: parent.left; leftMargin: pal.pad
+                right: parent.right; rightMargin: pal.pad
+            }
             spacing: units.gu(1)
-            visible: page.result === ""
 
-            Button {
-                width: (parent.width - units.gu(1)) / 2
-                text: root.tr("Capture")
-                color: UbuntuColors.blue
-                enabled: !page.busy && cam.cameraStatus === Camera.ActiveStatus
-                onClicked: page.shoot(true)
+            Text {
+                id: hint
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                color: pal.dim
+                font.pixelSize: pal.fsSmall
+                text: root.tr("point the camera at a QR code")
             }
-            Button {
-                width: (parent.width - units.gu(1)) / 2
-                text: page.autoScan ? root.tr("Auto: on") : root.tr("Auto: off")
-                onClicked: page.autoScan = !page.autoScan
-            }
-        }
 
-        Button {
-            width: parent.width
-            text: root.tr("Import as node")
-            color: UbuntuColors.green
-            visible: page.result !== ""
-            onClicked: page.apply("node")
-        }
-        Button {
-            width: parent.width
-            text: root.tr("Add as subscription")
-            visible: page.result !== "" && page.looksLikeURL(page.result)
-            onClicked: page.apply("sub")
-        }
-        Button {
-            width: parent.width
-            text: root.tr("Scan again")
-            visible: page.result !== ""
-            onClicked: {
-                page.result = ""
-                page.busy = false
-                page.shots = 0
-                hint.text = root.tr("point the camera at a QR code")
-                page.refocus()
+            RNote {
+                id: msg
+                width: parent.width
+                tone: "bad"
+            }
+
+            Text {
+                width: parent.width
+                visible: page.result !== ""
+                text: page.result
+                color: pal.text
+                font.family: "Ubuntu Mono"
+                font.pixelSize: pal.fsSmall
+                wrapMode: Text.WrapAnywhere
+                maximumLineCount: 3
+                elide: Text.ElideRight
+            }
+
+            Row {
+                width: parent.width
+                spacing: units.gu(1)
+                visible: page.result === ""
+
+                RButton {
+                    width: (parent.width - units.gu(1)) / 2
+                    icon: "camera"
+                    text: root.tr("Capture")
+                    variant: "primary"
+                    enabled: !page.busy && cam.cameraStatus === Camera.ActiveStatus
+                    onClicked: page.shoot(true)
+                }
+                RButton {
+                    width: (parent.width - units.gu(1)) / 2
+                    variant: "ghost"
+                    text: page.autoScan ? root.tr("Auto: on") : root.tr("Auto: off")
+                    onClicked: page.autoScan = !page.autoScan
+                }
+            }
+
+            RButton {
+                width: parent.width
+                icon: "download"
+                text: root.tr("Import as node")
+                variant: "success"
+                visible: page.result !== ""
+                onClicked: page.apply("node")
+            }
+            RButton {
+                width: parent.width
+                icon: "link"
+                text: root.tr("Add as subscription")
+                variant: "ghost"
+                visible: page.result !== "" && page.looksLikeURL(page.result)
+                onClicked: page.apply("sub")
+            }
+            RButton {
+                width: parent.width
+                text: root.tr("Scan again")
+                variant: "plain"
+                visible: page.result !== ""
+                onClicked: {
+                    page.result = ""
+                    page.busy = false
+                    page.shots = 0
+                    hint.text = root.tr("point the camera at a QR code")
+                    page.refocus()
+                }
             }
         }
     }

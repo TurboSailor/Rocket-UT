@@ -1,15 +1,12 @@
 import QtQuick 2.7
 import Ubuntu.Components 1.3
-import Ubuntu.Components.ListItems 1.3 as ListItem
 
+// Конфиги: добавление по ссылке или из файла и список конфигов.
+// Активация и удаление разнесены по отдельным кнопкам строки.
 Page {
     id: page
     property string activeConf: ""
 
-    header: PageHeader {
-        id: hdr
-        title: root.tr("Configs")
-    }
     onVisibleChanged: if (visible) reload()
 
     function reload() {
@@ -20,91 +17,135 @@ Page {
         })
     }
 
-    Column {
-        id: form
-        anchors { top: hdr.bottom; left: parent.left; right: parent.right; margins: units.gu(2) }
-        spacing: units.gu(1)
+    Rectangle {
+        anchors.fill: parent
+        color: pal.bg
+    }
 
-        TextField {
-            id: nameField
-            width: parent.width
-            placeholderText: root.tr("Config name")
-            text: "shadowrocket"
-            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
+    RHeader {
+        id: hdr
+        title: root.tr("Configs")
+    }
+
+    // --- добавление конфига ---
+    RCard {
+        id: formCard
+        anchors {
+            top: hdr.bottom; topMargin: pal.pad
+            left: parent.left; leftMargin: pal.pad
+            right: parent.right; rightMargin: pal.pad
         }
-        TextField {
-            id: urlField
-            width: parent.width
-            placeholderText: root.tr("URL")
-            inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
-        }
-        Button {
-            width: parent.width
-            text: root.tr("Add from URL")
-            color: UbuntuColors.green
-            enabled: urlField.text.trim() !== "" && nameField.text.trim() !== ""
-            onClicked: {
-                msg.text = root.tr("working…")
-                root.api("/conf/fromurl?name=" + encodeURIComponent(nameField.text.trim())
-                         + "&url=" + encodeURIComponent(urlField.text.trim()),
-                    function(r, code) {
-                        if (!r || r.error) { msg.text = (r && r.error) || ("HTTP " + code); return }
-                        msg.text = r.rules + " " + root.tr("rules") + ", "
-                                 + r.proxies + " " + root.tr("proxies")
-                                 + (r.skipped && r.skipped.length
-                                    ? ", " + r.skipped.length + " " + root.tr("unsupported lines") : "")
-                        urlField.text = ""
-                        reload(); root.refresh()
-                    }, "POST")
+        height: form.height + units.gu(3)
+
+        Column {
+            id: form
+            anchors {
+                left: parent.left; leftMargin: units.gu(1.5)
+                right: parent.right; rightMargin: units.gu(1.5)
+                verticalCenter: parent.verticalCenter
+            }
+            spacing: pal.gap
+
+            RField {
+                id: nameField
+                width: parent.width
+                placeholderText: root.tr("Config name")
+                text: "shadowrocket"
+                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhPreferLowercase
+            }
+            RField {
+                id: urlField
+                width: parent.width
+                placeholderText: root.tr("URL")
+                inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
+            }
+            RButton {
+                width: parent.width
+                variant: "primary"
+                text: root.tr("Add from URL")
+                enabled: urlField.text.trim() !== "" && nameField.text.trim() !== ""
+                onClicked: {
+                    msg.text = root.tr("working…")
+                    root.api("/conf/fromurl?name=" + encodeURIComponent(nameField.text.trim())
+                             + "&url=" + encodeURIComponent(urlField.text.trim()),
+                        function(r, code) {
+                            if (!r || r.error) { msg.text = (r && r.error) || ("HTTP " + code); return }
+                            msg.text = r.rules + " " + root.tr("rules") + ", "
+                                     + r.proxies + " " + root.tr("proxies")
+                                     + (r.skipped && r.skipped.length
+                                        ? ", " + r.skipped.length + " " + root.tr("unsupported lines") : "")
+                            urlField.text = ""
+                            reload(); root.refresh()
+                        }, "POST")
+                }
+            }
+            RButton {
+                width: parent.width
+                variant: "ghost"
+                icon: "folder"
+                text: root.tr("Open file")
+                onClicked: { root.pendingFile = "conf"; stack.push(filePage) }
+            }
+            RNote {
+                id: msg
+                width: parent.width
+                tone: "warn"
             }
         }
-        Button {
-            width: parent.width
-            text: root.tr("Open file")
-            onClicked: { root.pendingFile = "conf"; stack.push(filePage) }
-        }
-        Label {
-            id: msg
-            width: parent.width
-            wrapMode: Text.Wrap
-            fontSize: "small"
-            color: UbuntuColors.orange
-        }
     }
 
-    Label {
-        anchors.centerIn: parent
-        visible: (root.confs || []).length === 0
-        text: root.tr("no configs yet")
-        color: UbuntuColors.graphite
-    }
-
+    // --- список конфигов ---
     ListView {
-        anchors { top: form.bottom; topMargin: units.gu(1); bottom: parent.bottom
-                  left: parent.left; right: parent.right }
+        id: list
+        anchors {
+            top: formCard.bottom
+            bottom: parent.bottom
+            left: parent.left
+            right: parent.right
+        }
         model: root.confs || []
+        topMargin: pal.gap
+        bottomMargin: pal.pad
+        spacing: units.gu(1)
         clip: true
-        delegate: ListItem.Standard {
-            text: modelData + (modelData === page.activeConf ? "  ●  " + root.tr("active") : "")
-            selected: modelData === page.activeConf
+
+        delegate: RRow {
+            x: pal.pad
+            width: list.width - 2 * pal.pad
+            icon: "file"
+            tint: modelData === page.activeConf ? pal.accent : pal.dim
+            title: modelData
+            subtitle: modelData === page.activeConf ? root.tr("active") : ""
+            active: modelData === page.activeConf
+            chevron: true
             onClicked: {
                 confEdit.confName = modelData
                 stack.push(confEdit)
             }
-            control: Button {
-                text: modelData === page.activeConf ? "✕" : "▶"
-                width: units.gu(4.5)
+
+            RIconButton {
+                visible: modelData !== page.activeConf
+                name: "play"
+                tint: pal.ok
                 onClicked: {
-                    if (modelData === page.activeConf) {
-                        root.api("/conf/delete?name=" + encodeURIComponent(modelData),
-                                 function(r) { reload(); root.refresh() }, "POST")
-                    } else {
-                        root.busy = root.tr("working…")
-                        root.api("/conf/select?name=" + encodeURIComponent(modelData),
-                                 function(r) { root.busy = ""; root.absorb(r); reload() }, "POST")
-                    }
+                    root.busy = root.tr("working…")
+                    root.api("/conf/select?name=" + encodeURIComponent(modelData),
+                             function(r) { root.busy = ""; root.absorb(r); reload() }, "POST")
                 }
             }
+            RIconButton {
+                name: "trash"
+                tint: pal.bad
+                onClicked: root.api("/conf/delete?name=" + encodeURIComponent(modelData),
+                                    function(r) { reload(); root.refresh() }, "POST")
+            }
         }
+    }
+
+    REmpty {
+        anchors.centerIn: list
+        visible: (root.confs || []).length === 0
+        icon: "file"
+        text: root.tr("no configs yet")
     }
 }

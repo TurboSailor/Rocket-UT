@@ -1,20 +1,25 @@
 import QtQuick 2.7
 import Ubuntu.Components 1.3
 
+// Импорт: три источника (сканер, картинка с QR, файл) плюс ручная вставка
+// текста конфига/ссылок в многострочное поле.
 Page {
     id: page
-
-    header: PageHeader {
-        id: hdr
-        title: root.tr("Import")
-        flickable: flick
-    }
 
     // setText вызывается из FilePage после чтения файла.
     function setText(t) { area.text = t }
 
+    Rectangle {
+        anchors.fill: parent
+        color: pal.bg
+    }
+
+    RHeader {
+        id: hdr
+        title: root.tr("Import")
+    }
+
     Flickable {
-        id: flick
         anchors { top: hdr.bottom; bottom: parent.bottom; left: parent.left; right: parent.right }
         contentWidth: width
         contentHeight: col.height + units.gu(4)
@@ -22,46 +27,57 @@ Page {
 
         Column {
             id: col
-            width: parent.width - units.gu(4)
-            anchors { top: parent.top; topMargin: units.gu(2); horizontalCenter: parent.horizontalCenter }
-            spacing: units.gu(1)
+            anchors {
+                top: parent.top; topMargin: pal.pad
+                left: parent.left; leftMargin: pal.pad
+                right: parent.right; rightMargin: pal.pad
+            }
+            spacing: pal.gap
 
-            Label {
+            RNote {
                 width: parent.width
-                wrapMode: Text.Wrap
-                fontSize: "small"
+                tone: "info"
                 text: root.tr("Import from file or paste text below")
             }
-            Label {
+
+            // Список форматов длинный: обычный Text с переносом, потому что
+            // RLabel обрезает по ширине.
+            Text {
                 width: parent.width
                 wrapMode: Text.Wrap
-                fontSize: "x-small"
-                color: UbuntuColors.graphite
+                color: pal.faint
+                font.pixelSize: pal.fsTiny
                 text: root.tr("Supported: vless, vmess, ss, trojan, socks5, http, ssh URIs, sub:// links, Shadowrocket .conf, AmneziaWG .conf")
             }
 
-            Button {
+            // --- источники ---
+            RButton {
                 width: parent.width
+                icon: "camera"
                 text: root.tr("Scan QR")
-                color: UbuntuColors.orange
+                variant: "primary"
                 onClicked: stack.push(scanPage)
             }
-            Button {
+            RButton {
                 width: parent.width
+                icon: "file"
                 text: root.tr("QR from image")
+                variant: "ghost"
                 onClicked: { root.pendingFile = "qr"; stack.push(filePage) }
             }
-            Button {
+            RButton {
                 width: parent.width
+                icon: "folder"
                 text: root.tr("Open file")
+                variant: "ghost"
                 onClicked: { root.pendingFile = "import"; stack.push(filePage) }
             }
-            Label {
+
+            RLabel {
                 width: parent.width
                 text: root.tr("AmneziaWG name")
-                fontSize: "small"
             }
-            TextField {
+            RField {
                 id: nameField
                 width: parent.width
                 text: "awg"
@@ -70,26 +86,38 @@ Page {
                 inputMethodHints: Qt.ImhPreferLowercase | Qt.ImhNoPredictiveText
             }
 
-            TextArea {
-                id: area
+            // Многострочный ввод — TextArea из UITK (SuruDark), в тёмной
+            // карточке-подложке, чтобы рамка совпадала с остальной формой.
+            RCard {
                 width: parent.width
-                height: units.gu(28)
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
-                placeholderText: root.tr("Paste links or config")
+                height: area.height + units.gu(2)
+
+                TextArea {
+                    id: area
+                    anchors {
+                        left: parent.left; leftMargin: units.gu(1)
+                        right: parent.right; rightMargin: units.gu(1)
+                        verticalCenter: parent.verticalCenter
+                    }
+                    height: units.gu(26)
+                    font.family: "Ubuntu Mono"
+                    font.pixelSize: pal.fsSmall
+                    inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+                    placeholderText: root.tr("Paste links or config")
+                }
             }
 
-            Label {
+            RNote {
                 id: msg
                 width: parent.width
-                wrapMode: Text.Wrap
-                fontSize: "small"
-                color: UbuntuColors.red
+                tone: "bad"
             }
 
-            Button {
+            RButton {
                 width: parent.width
+                icon: "download"
                 text: root.tr("Import")
-                color: UbuntuColors.green
+                variant: "success"
                 enabled: area.text.trim() !== ""
                 onClicked: {
                     msg.text = root.tr("working…")

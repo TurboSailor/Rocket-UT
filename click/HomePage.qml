@@ -1,49 +1,40 @@
 import QtQuick 2.7
 import Ubuntu.Components 1.3
 
+// Главный экран: круглая кнопка питания, состояние туннеля, режим
+// маршрутизации и плитки разделов.
 Page {
     id: page
 
-    header: PageHeader {
+    // tone — цвет состояния, от него красится вся геройская карточка.
+    readonly property color tone: root.st.error ? pal.warn
+                                : (root.st.up ? pal.ok : pal.faint)
+
+    function toggle() {
+        if (root.busy !== "") return
+        root.busy = root.tr("working…")
+        root.api(root.st.up ? "/down" : "/up", function(r) {
+            root.busy = ""
+            root.absorb(r)
+        }, "POST")
+    }
+
+    function setMode(v) {
+        if (v === root.st.mode) return
+        root.busy = root.tr("working…")
+        root.api("/mode?v=" + v, function(r) { root.busy = ""; root.absorb(r) }, "POST")
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: pal.bg
+    }
+
+    RHeader {
         id: hdr
-        // Иконка приложения в заголовке: title рисует только текст,
-        // поэтому заголовок собираем сами через contents.
-        contents: Row {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: units.gu(1)
-            Image {
-                source: Qt.resolvedUrl("icon.png")
-                width: units.gu(3.5)
-                height: width
-                sourceSize.width: units.gu(3.5) * 2
-                sourceSize.height: units.gu(3.5) * 2
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                anchors.verticalCenter: parent.verticalCenter
-            }
-            Label {
-                text: root.tr("Rocket")
-                fontSize: "large"
-                anchors.verticalCenter: parent.verticalCenter
-            }
-        }
-        trailingActionBar.actions: [
-            Action {
-                iconName: "filters"
-                text: root.tr("Rules")
-                onTriggered: stack.push(rulesPage)
-            },
-            Action {
-                iconName: "settings"
-                text: root.tr("Configs")
-                onTriggered: stack.push(confsPage)
-            },
-            Action {
-                iconName: "history"
-                text: root.tr("Log")
-                onTriggered: stack.push(logPage)
-            }
-        ]
+        title: root.tr("Rocket")
+        back: false
+        icon: "bolt"
     }
 
     Flickable {
@@ -54,106 +45,245 @@ Page {
 
         Column {
             id: col
-            width: parent.width - units.gu(4)
-            anchors { top: parent.top; topMargin: units.gu(2); horizontalCenter: parent.horizontalCenter }
-            spacing: units.gu(1.5)
+            anchors {
+                top: parent.top; topMargin: pal.pad
+                left: parent.left; leftMargin: pal.pad
+                right: parent.right; rightMargin: pal.pad
+            }
+            spacing: pal.gap
 
-            UbuntuShape {
+            // --- состояние туннеля ---
+            RCard {
+                id: hero
                 width: parent.width
-                height: units.gu(13)
-                backgroundColor: root.st.error ? UbuntuColors.graphite
-                                : (root.st.up ? UbuntuColors.green : UbuntuColors.red)
-                Column {
-                    anchors.centerIn: parent
-                    spacing: units.gu(0.5)
-                    Label {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: root.st.up ? root.tr("CONNECTED") : root.tr("DISCONNECTED")
-                        color: "white"; fontSize: "x-large"; font.bold: true
+                height: units.gu(33)
+
+                Item {
+                    id: power
+                    width: Math.min(units.gu(17), hero.width * 0.45)
+                    height: width
+                    anchors {
+                        horizontalCenter: parent.horizontalCenter
+                        top: parent.top
+                        topMargin: units.gu(2.5)
                     }
-                    Label {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: col.width - units.gu(2)
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.Wrap
-                        text: root.st.error ? root.st.error
-                             : (root.st.node ? root.nodeLabel(root.st.node) : root.tr("no node selected"))
-                        color: "white"; fontSize: "small"; opacity: 0.9
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: Qt.rgba(page.tone.r, page.tone.g, page.tone.b, 0.07)
+                        border.width: 1
+                        border.color: Qt.rgba(page.tone.r, page.tone.g, page.tone.b, 0.3)
+                    }
+
+                    Rectangle {
+                        id: disc
+                        anchors.centerIn: parent
+                        width: parent.width - units.gu(3)
+                        height: width
+                        radius: width / 2
+                        color: Qt.rgba(page.tone.r, page.tone.g, page.tone.b, root.st.up ? 0.2 : 0.1)
+                        border.width: units.dp(1.5)
+                        border.color: page.tone
+                        opacity: touch.pressed ? 0.65 : 1
+
+                        RIcon {
+                            anchors.centerIn: parent
+                            name: "power"
+                            tint: page.tone
+                            size: parent.width * 0.45
+                            weight: units.dp(1.3)
+                        }
+                    }
+
+                    MouseArea {
+                        id: touch
+                        anchors.fill: parent
+                        enabled: root.busy === ""
+                        onClicked: page.toggle()
+                    }
+                }
+
+                Text {
+                    id: stateText
+                    anchors {
+                        left: parent.left; leftMargin: units.gu(1.5)
+                        right: parent.right; rightMargin: units.gu(1.5)
+                        top: power.bottom; topMargin: units.gu(1.5)
+                    }
+                    horizontalAlignment: Text.AlignHCenter
+                    text: root.busy !== "" ? root.busy
+                         : (root.st.up ? root.tr("CONNECTED") : root.tr("DISCONNECTED"))
+                    color: page.tone
+                    font.pixelSize: pal.fsTitle
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: units.dp(0.5)
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    anchors {
+                        left: parent.left; leftMargin: units.gu(2)
+                        right: parent.right; rightMargin: units.gu(2)
+                        top: stateText.bottom; topMargin: units.gu(0.5)
+                    }
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                    text: root.st.error ? root.st.error
+                         : (root.st.node ? root.nodeLabel(root.st.node)
+                                         : root.tr("no node selected"))
+                    color: pal.dim
+                    font.pixelSize: pal.fsSmall
+                }
+
+                // --- трафик ---
+                Rectangle {
+                    id: sep
+                    anchors {
+                        left: parent.left; leftMargin: units.gu(1.5)
+                        right: parent.right; rightMargin: units.gu(1.5)
+                        bottom: traffic.top; bottomMargin: units.gu(1)
+                    }
+                    height: 1
+                    color: pal.border
+                }
+
+                Row {
+                    id: traffic
+                    anchors {
+                        left: parent.left; leftMargin: units.gu(1.5)
+                        right: parent.right; rightMargin: units.gu(1.5)
+                        bottom: parent.bottom; bottomMargin: units.gu(1.5)
+                    }
+                    height: units.gu(3)
+
+                    Row {
+                        width: (traffic.width - units.gu(1)) / 2
+                        height: parent.height
+                        spacing: units.gu(0.75)
+
+                        RIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            name: "download"
+                            tint: pal.accent
+                            size: units.gu(2)
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.fmtBytes(root.st.rx)
+                            color: pal.text
+                            font.pixelSize: pal.fsSmall
+                        }
+                    }
+                    Item { width: units.gu(1); height: 1 }
+                    Row {
+                        width: (traffic.width - units.gu(1)) / 2
+                        height: parent.height
+                        spacing: units.gu(0.75)
+                        layoutDirection: Qt.RightToLeft
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.fmtBytes(root.st.tx)
+                            color: pal.text
+                            font.pixelSize: pal.fsSmall
+                        }
+                        RIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            name: "upload"
+                            tint: pal.violet
+                            size: units.gu(2)
+                        }
                     }
                 }
             }
 
-            Switch {
-                anchors.horizontalCenter: parent.horizontalCenter
-                checked: root.st.up === true
-                enabled: root.busy === ""
-                onClicked: {
-                    root.busy = root.tr("working…")
-                    root.api(checked ? "/up" : "/down", function(r) {
-                        root.busy = ""
-                        root.absorb(r)
-                    }, "POST")
+            // --- режим маршрутизации ---
+            RLabel {
+                width: parent.width
+                section: true
+                text: root.tr("Routing")
+            }
+
+            RSegment {
+                width: parent.width
+                options: [root.tr("Rules"), root.tr("Proxy"), root.tr("Direct")]
+                currentIndex: root.st.mode === "proxy" ? 1 : (root.st.mode === "direct" ? 2 : 0)
+                onSelected: page.setMode(index === 1 ? "proxy" : (index === 2 ? "direct" : "config"))
+            }
+
+            // --- разделы ---
+            RLabel {
+                width: parent.width
+                section: true
+                text: root.tr("Sections")
+            }
+
+            Grid {
+                width: parent.width
+                columns: 2
+                spacing: pal.gap
+
+                RTile {
+                    width: (parent.width - pal.gap) / 2
+                    icon: "server"
+                    tint: pal.accent
+                    label: root.tr("Nodes")
+                    value: String(root.nodes.length)
+                    onClicked: stack.push(nodesPage)
+                }
+                RTile {
+                    width: (parent.width - pal.gap) / 2
+                    icon: "link"
+                    tint: pal.violet
+                    label: root.tr("Subscriptions")
+                    value: String(root.subs.length)
+                    onClicked: stack.push(subsPage)
+                }
+                RTile {
+                    width: (parent.width - pal.gap) / 2
+                    icon: "download"
+                    tint: pal.ok
+                    label: root.tr("Import")
+                    onClicked: stack.push(importPage)
+                }
+                RTile {
+                    width: (parent.width - pal.gap) / 2
+                    icon: "filter"
+                    tint: pal.warn
+                    label: root.tr("Rules")
+                    onClicked: stack.push(rulesPage)
+                }
+                RTile {
+                    width: (parent.width - pal.gap) / 2
+                    icon: "file"
+                    tint: pal.dim
+                    label: root.tr("Configs")
+                    onClicked: stack.push(confsPage)
+                }
+                RTile {
+                    width: (parent.width - pal.gap) / 2
+                    icon: "clock"
+                    tint: pal.accent
+                    label: root.tr("Log")
+                    onClicked: stack.push(logPage)
                 }
             }
 
-            Label {
+            // --- предупреждения демона ---
+            RNote {
                 width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                text: root.busy !== "" ? root.busy
-                      : (root.st.up ? "↓ " + root.fmtBytes(root.st.rx) + "   ↑ " + root.fmtBytes(root.st.tx) : " ")
-            }
-
-            Label {
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                fontSize: "small"
-                color: UbuntuColors.graphite
-                visible: root.st.handshake_age !== undefined
+                tone: "info"
                 text: root.st.handshake_age !== undefined
-                      ? "awg0 handshake: " + root.st.handshake_age + "s" : ""
+                      ? "awg0 handshake " + root.st.handshake_age + "s" : ""
             }
-
-            Label { text: root.tr("Routing"); font.bold: true }
-
-            OptionSelector {
-                id: modeSel
+            RNote {
                 width: parent.width
-                model: [root.tr("Config rules"), root.tr("Proxy all"), root.tr("Direct")]
-                // Индекс синхронизируется со статусом, но не перебивает выбор пользователя.
-                selectedIndex: root.st.mode === "proxy" ? 1 : (root.st.mode === "direct" ? 2 : 0)
-                onDelegateClicked: {
-                    var v = index === 1 ? "proxy" : (index === 2 ? "direct" : "config")
-                    if (v === root.st.mode) return
-                    root.busy = root.tr("working…")
-                    root.api("/mode?v=" + v, function(r) { root.busy = ""; root.absorb(r) }, "POST")
-                }
-            }
-
-            Button {
-                width: parent.width
-                text: root.tr("Nodes") + "  (" + root.nodes.length + ")"
-                color: UbuntuColors.blue
-                onClicked: stack.push(nodesPage)
-            }
-            Button {
-                width: parent.width
-                text: root.tr("Subscriptions")
-                onClicked: stack.push(subsPage)
-            }
-            Button {
-                width: parent.width
-                text: root.tr("Import")
-                color: UbuntuColors.green
-                onClicked: stack.push(importPage)
-            }
-
-            Label {
-                width: parent.width
-                wrapMode: Text.Wrap
-                fontSize: "small"
-                color: UbuntuColors.orange
-                visible: root.st.skipped !== undefined && root.st.skipped.length > 0
-                text: visible ? (root.st.skipped.length + " " + root.tr("unsupported lines")) : ""
+                tone: "warn"
+                text: (root.st.skipped !== undefined && root.st.skipped.length > 0)
+                      ? root.st.skipped.length + " " + root.tr("unsupported lines") : ""
             }
         }
     }
