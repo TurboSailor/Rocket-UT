@@ -9,7 +9,9 @@ Item {
     width: units.gu(@WIDTH@)
     height: units.gu(100)
 
-    Pal { id: pal }
+    property bool darkTheme: @DARK@
+
+    Pal { id: pal; dark: root.darkTheme }
 
     // --- заглушки состояния main.qml ---
     property var st: ({

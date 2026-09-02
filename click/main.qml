@@ -12,9 +12,10 @@ MainView {
     width: units.gu(45)
     height: units.gu(75)
 
-    // Тёмная тема: SuruDark влияет на то, что рисует UITK (TextArea,
-    // ActivityIndicator, диалоги), остальное красит палитра pal.
-    theme.name: "Ubuntu.Components.Themes.SuruDark"
+    // Тема UITK идёт за нашей палитрой: SuruDark/Ambiance красят то, что
+    // рисует сам тулкит (TextArea, ActivityIndicator, диалоги).
+    theme.name: root.darkTheme ? "Ubuntu.Components.Themes.SuruDark"
+                               : "Ubuntu.Components.Themes.Ambiance"
     backgroundColor: pal.bg
 
     property var st: ({up: false, mode: "config"})
@@ -27,9 +28,17 @@ MainView {
     property string pendingFile: "import"
     // Ручная поправка поворота предпросмотра камеры, живёт в пределах сессии.
     property int qrPreviewRotation: 0
+    // Тема: светлая по умолчанию, выбор пользователя запоминается.
+    property bool darkTheme: false
 
     // Палитра и метрики; страницы видят её как `pal` через цепочку контекстов.
-    Pal { id: pal }
+    Pal { id: pal; dark: root.darkTheme }
+
+    Settings {
+        id: uiPrefs
+        category: "ui"
+        property alias darkTheme: root.darkTheme
+    }
 
     function tr(k) { return I18n.tr(k) }
 

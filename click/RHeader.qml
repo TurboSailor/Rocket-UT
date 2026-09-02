@@ -10,6 +10,7 @@ Item {
     property string title: ""
     property bool back: true
     property string icon: ""
+    property url iconSource: ""
     default property alias trailing: trailingRow.data
 
     anchors { top: parent.top; left: parent.left; right: parent.right }
@@ -36,18 +37,34 @@ Item {
         onClicked: stack.pop()
     }
 
-    RIcon {
+    Item {
         id: leadIcon
-        visible: hdr.icon !== ""
-        width: visible ? units.gu(3) : 0
+        visible: hdr.icon !== "" || String(hdr.iconSource) !== ""
+        width: visible ? units.gu(3.5) : 0
+        height: units.gu(3.5)
         anchors {
             left: backBtn.right
             leftMargin: visible ? units.gu(1) : 0
             verticalCenter: parent.verticalCenter
         }
-        name: hdr.icon
-        tint: pal.accent
-        size: units.gu(3)
+
+        RIcon {
+            anchors.centerIn: parent
+            visible: hdr.icon !== ""
+            name: hdr.icon
+            tint: pal.accent
+            size: units.gu(3)
+        }
+        // Иконка приложения: png, а не рисованный значок.
+        Image {
+            anchors.fill: parent
+            visible: String(hdr.iconSource) !== ""
+            source: hdr.iconSource
+            sourceSize.width: Math.round(units.gu(3.5) * 2)
+            sourceSize.height: Math.round(units.gu(3.5) * 2)
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+        }
     }
 
     Text {

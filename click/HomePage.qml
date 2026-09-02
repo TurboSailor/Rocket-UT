@@ -34,7 +34,14 @@ Page {
         id: hdr
         title: root.tr("Rocket")
         back: false
-        icon: "bolt"
+        iconSource: Qt.resolvedUrl("icon.png")
+
+        // Переключение светлой и тёмной темы.
+        RIconButton {
+            name: root.darkTheme ? "sun" : "moon"
+            tint: pal.dim
+            onClicked: root.darkTheme = (root.darkTheme === false)
+        }
     }
 
     Flickable {

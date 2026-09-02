@@ -26,8 +26,9 @@ camera, shows a live connection log and lets you turn any log entry into a routi
 - **Routing modes** — `config` (rules from `.conf`), `proxy` (everything through the node),
   `direct`.
 - **Bilingual UI** — English / Russian, picked from the system locale.
-- **Dark UI** — own component set (cards, stroke SVG icons, segmented controls),
-  sized in grid units so it scales from 32 to 60 gu wide screens.
+- **Light and dark UI** — own component set (cards, stroke SVG icons, segmented
+  controls), sized in grid units so it scales from 32 to 60 gu wide screens;
+  the theme is switched from the home header and remembered between runs.
 
 ## How it works
 
@@ -68,7 +69,7 @@ Download `rocket_<version>_all.click` and `rocketd` from a release (or build the
 then on the device:
 
 ```bash
-adb push rocket_0.2.0_all.click rocketd scripts/install.sh /home/phablet/Downloads/
+adb push rocket_0.2.1_all.click rocketd scripts/install.sh /home/phablet/Downloads/
 adb shell
 sudo bash /home/phablet/Downloads/install.sh
 ```
@@ -196,9 +197,10 @@ ran on the device itself over loopback, so it had no NAT).
 - **Режимы маршрутизации** — `config` (правила из `.conf`), `proxy` (всё через узел),
   `direct`.
 - **Двуязычный интерфейс** — русский / английский по локали системы.
-- **Тёмный интерфейс** — собственный набор компонентов (карточки, штриховые
+- **Светлая и тёмная темы** — собственный набор компонентов (карточки, штриховые
   SVG-иконки, сегментированные переключатели); размеры в grid units, поэтому
-  раскладка держится от 32 до 60 gu ширины.
+  раскладка держится от 32 до 60 gu ширины. Тема переключается кнопкой в шапке
+  главного экрана и запоминается между запусками.
 
 ## Как это устроено
 
@@ -229,7 +231,7 @@ ran on the device itself over loopback, so it had no NAT).
 Возьмите `rocket_<версия>_all.click` и `rocketd` из релиза (или соберите — см. ниже), затем:
 
 ```bash
-adb push rocket_0.2.0_all.click rocketd scripts/install.sh /home/phablet/Downloads/
+adb push rocket_0.2.1_all.click rocketd scripts/install.sh /home/phablet/Downloads/
 adb shell
 sudo bash /home/phablet/Downloads/install.sh
 ```

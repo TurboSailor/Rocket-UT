@@ -13,7 +13,7 @@ trap 'rm -rf "$STAGE"' EXIT
 cp "$ROOT"/click/*.qml "$ROOT"/click/*.js "$ROOT"/click/icon.png "$STAGE/"
 for p in $PAGES; do
   for w in $WIDTHS; do
-    sed -e "s/@PAGE@/$p/g" -e "s/@WIDTH@/$w/g" \
+    sed -e "s/@PAGE@/$p/g" -e "s/@WIDTH@/$w/g" -e "s/@DARK@/${DARK:-false}/g" \
         "$ROOT/click/dev/harness.qml.in" > "$STAGE/check_${p}_${w}.qml"
   done
 done
