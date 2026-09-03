@@ -8,6 +8,7 @@ camera, shows a live connection log and lets you turn any log entry into a routi
 🇷🇺 [Русская версия ниже](#rocket-для-ubuntu-touch) · 🇬🇧 English version first.
 
 ---
+https://i.ibb.co/mCGqLLjD/screenshot20260903-193613654.png
 
 ## Features
 
